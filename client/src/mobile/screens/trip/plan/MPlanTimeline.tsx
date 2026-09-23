@@ -28,6 +28,7 @@ import GoogleMapsIcon from '../../../../components/shared/GoogleMapsIcon'
 import VoyaDayEditModal from '../../../../components/Planner/VoyaDayEditModal'
 import VoyaTripEditModal from '../../../../components/Planner/VoyaTripEditModal'
 import VoyaLiveTripCard from '../../../../components/Planner/VoyaLiveTripCard'
+import VoyaJourneyStrip from '../../../../components/Planner/VoyaJourneyStrip'
 import { findTodayDayId } from '../../../../components/Planner/today'
 import { useTripStore } from '../../../../store/tripStore'
 import { isRtlLanguage } from '../../../../i18n'
@@ -175,6 +176,13 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
         className="voya-mobile-timeline-card absolute left-4 right-4 overflow-y-auto overscroll-contain rounded-[26px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-3.5 pb-2 pt-1 backdrop-blur-[24px] backdrop-saturate-[1.6] bottom-[calc(env(safe-area-inset-bottom,0px)+90px)]"
         style={{ top: `calc(var(--m-safe-top, 12px) + ${editing ? 140 : (!liveTripActive && tl.upNext ? 216 : 102)}px)` }}
       >
+        <VoyaJourneyStrip
+          days={planner.days}
+          selectedDayId={planner.selectedDayId}
+          onSelectDay={(journeyDayId) => planner.handleSelectDay(journeyDayId, true)}
+          compact
+        />
+
         {liveTripActive && (
           <div className="pb-2 pt-1">
             <VoyaLiveTripCard
