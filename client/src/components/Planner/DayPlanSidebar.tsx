@@ -54,6 +54,7 @@ import { DayPlanSidebarToolbar } from './DayPlanSidebarToolbar'
 import VoyaDayEditModal from './VoyaDayEditModal'
 import VoyaTripEditModal from './VoyaTripEditModal'
 import VoyaLiveTripCard from './VoyaLiveTripCard'
+import VoyaJourneyStrip from './VoyaJourneyStrip'
 import { DayPlanSidebarNoteModal } from './DayPlanSidebarNoteModal'
 import { DayPlanSidebarTimeConfirmModal } from './DayPlanSidebarTimeConfirmModal'
 import { DayPlanSidebarTransportDetailModal } from './DayPlanSidebarTransportDetailModal'
@@ -1567,6 +1568,12 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
         canManageShare={canManageShare}
         onReorderDays={onReorderDays}
         onAddDay={onAddDay}
+      />
+
+      <VoyaJourneyStrip
+        days={days}
+        selectedDayId={selectedDayId}
+        onSelectDay={(dayId) => onSelectDay(dayId, false)}
       />
 
       <div className="px-3 pt-2">
