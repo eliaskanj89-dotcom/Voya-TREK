@@ -94,6 +94,7 @@ export const voyaVerifyTripResultSchema = z.object({
   verified: z.number().int().nonnegative(),
   unresolved: z.number().int().nonnegative(),
   skipped: z.number().int().nonnegative(),
+  optimizedDays: z.number().int().nonnegative().default(0),
   sourceCounts: z.record(z.string(), z.number().int().nonnegative()),
   items: z.array(z.object({
     placeId: z.number().int().positive(),
