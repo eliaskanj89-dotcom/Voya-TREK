@@ -380,14 +380,17 @@ export default function LoginPage(): React.ReactElement {
               wide and low-opacity rather than a hard drop shadow, so it reads as the
               map dimming around the mark instead of an outline. */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-            <img
-              src="/logo-light.svg"
-              alt="TREK"
+            <div
+              className="voya-wordmark"
+              aria-label="Voya"
               style={{
-                height: 'clamp(58px, 5.2vw, 84px)',
-                filter: 'drop-shadow(0 2px 10px rgba(4,8,20,0.55)) drop-shadow(0 0 34px rgba(4,8,20,0.45))',
+                color: 'white',
+                fontSize: 'clamp(58px, 5.2vw, 84px)',
+                textShadow: '0 2px 10px rgba(4,8,20,0.55), 0 0 34px rgba(4,8,20,0.45)',
               }}
-            />
+            >
+              Voya
+            </div>
           </div>
 
           <h2
