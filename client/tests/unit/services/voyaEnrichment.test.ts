@@ -49,6 +49,32 @@ beforeEach(async () => {
   vi.restoreAllMocks()
   vi.clearAllMocks()
   await freshImports()
+  it('VOYA-ENRICH-004: resume reuses the persisted task id without adding a duplicate task', async () => {
+    verifyTrip.mockResolvedValue({
+      verified: 1,
+      unresolved: 0,
+      optimizedDays: 0,
+    })
+    refreshReadiness.mockRejectedValue(new Error('No configured LLM'))
+    tripHealth.mockResolvedValue({
+      score: 100,
+      label: 'Excellent',
+    })
+
+    enrichment.resumeVoyaEnrichment('persisted-voya-task', 12)
+
+    await vi.waitFor(() => expect(setVoyaDone).toHaveBeenCalledTimes(1))
+
+    expect(addVoyaTask).not.toHaveBeenCalled()
+    expect(setVoyaDone).toHaveBeenCalledWith('persisted-voya-task', {
+      verified: 1,
+      unresolved: 0,
+      optimizedDays: 0,
+      readinessRefreshed: false,
+      healthScore: 100,
+      healthLabel: 'Excellent',
+    })
+  })
 })
 
 describe('startVoyaEnrichment', () => {
