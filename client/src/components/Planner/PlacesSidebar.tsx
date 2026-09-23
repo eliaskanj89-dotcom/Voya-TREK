@@ -33,6 +33,7 @@ const PlacesSidebar = React.memo(function PlacesSidebar(props: PlacesSidebarProp
   const dragDisabled = isMobile
   return (
     <div
+      className="voya-places-sidebar"
       data-touch-drag={dragDisabled ? undefined : ''}
       onDragEnter={dragDisabled ? undefined : handleSidebarDragEnter}
       onDragOver={dragDisabled ? undefined : handleSidebarDragOver}
