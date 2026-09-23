@@ -49,6 +49,43 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
   const [voyaEditOpen, setVoyaEditOpen] = useState(false)
   const [voyaEditSeed, setVoyaEditSeed] = useState('')
   const [voyaTripEditOpen, setVoyaTripEditOpen] = useState(false)
+  const [pendingHealthRouteDayId, setPendingHealthRouteDayId] = useState<number | null>(null)
+  useEffect(() => {
+    const onHealthRepair = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        tripId?: number
+        dayId?: number
+        category?: string
+        instruction?: string
+      }>).detail
+      if (detail?.tripId !== planner.tripId || !detail.dayId) return
+
+      if (detail.category === 'Route') {
+        if (planner.selectedDayId === detail.dayId) {
+          void tl.optimize()
+        } else {
+          setPendingHealthRouteDayId(detail.dayId)
+          planner.handleSelectDay(detail.dayId, true)
+        }
+        return
+      }
+
+      if (detail.category === 'Schedule') {
+        if (planner.selectedDayId !== detail.dayId) planner.handleSelectDay(detail.dayId, true)
+        setVoyaEditSeed(detail.instruction || 'Make this day more realistic and fix its timing.')
+        setVoyaEditOpen(true)
+      }
+    }
+    window.addEventListener('voya:trip-health-repair', onHealthRepair)
+    return () => window.removeEventListener('voya:trip-health-repair', onHealthRepair)
+  }, [planner.tripId, planner.selectedDayId, planner.handleSelectDay, tl])
+
+  useEffect(() => {
+    if (pendingHealthRouteDayId == null || planner.selectedDayId !== pendingHealthRouteDayId) return
+    setPendingHealthRouteDayId(null)
+    void tl.optimize()
+  }, [pendingHealthRouteDayId, planner.selectedDayId, tl])
+
   const canEdit = can('day_edit', trip)
   const editing = shell.mode === 'edit' && canEdit
   const canEditPlaces = can('place_edit', trip)
