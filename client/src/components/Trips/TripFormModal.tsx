@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router'
 import Modal from '../shared/Modal'
 import { Calendar, Camera, Search, X, UserPlus, Bell } from 'lucide-react'
 import { tripsApi, authApi } from '../../api/client'
@@ -13,6 +14,7 @@ import { normalizeImageFile } from '../../utils/convertHeic'
 import { getApiErrorMessage, type Trip } from '../../types'
 import { MAX_TRIP_DAYS, tripSpanDays, type TripCreateRequest } from '@trek/shared'
 import { NumericInput } from '../shared/NumericInput'
+import VoyaPlanComposer from './VoyaPlanComposer'
 import { currenciesWith, SYMBOLS } from '../Budget/BudgetPanel.constants'
 
 type DateShiftMode = 'keep_bookings' | 'shift_all'
@@ -43,6 +45,7 @@ export default function TripFormModal({ isOpen, onClose, onSave, trip, onCoverUp
   // The staged cover lives on as an object URL until it is replaced or the modal goes.
   const previewUrlRef = useRef<string | null>(null)
   const toast = useToast()
+  const navigate = useNavigate()
   const { t } = useTranslation()
   const currentUser = useAuthStore(s => s.user)
   const defaultCurrency = useSettingsStore(s => s.settings.default_currency) || 'EUR'
@@ -224,6 +227,41 @@ export default function TripFormModal({ isOpen, onClose, onSave, trip, onCoverUp
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleVoyaCreated = async (createdTrip: Trip) => {
+    let memberAddFailed = false
+    for (const userId of selectedMembers) {
+      const selected = allUsers.find(user => user.id === userId)
+      if (!selected) continue
+      try {
+        await tripsApi.addMember(createdTrip.id, selected.username)
+      } catch {
+        memberAddFailed = true
+      }
+    }
+    if (memberAddFailed) toast.error(t('trips.memberAddError'))
+
+    if (pendingCoverFile) {
+      try {
+        const fd = new FormData()
+        fd.append('cover', pendingCoverFile)
+        const data = await tripsApi.uploadCover(createdTrip.id, fd)
+        onCoverUpdate?.(createdTrip.id, data.cover_image)
+      } catch {
+        toast.error(t('dashboard.coverUploadError'))
+      }
+    } else if (pendingUnsplashUrl) {
+      try {
+        await tripsApi.update(createdTrip.id, { cover_image: pendingUnsplashUrl })
+        onCoverUpdate?.(createdTrip.id, pendingUnsplashUrl)
+      } catch {
+        toast.error(t('dashboard.coverSaveError'))
+      }
+    }
+
+    onClose()
+    navigate(`/trips/${createdTrip.id}`)
   }
 
   const handleCoverSelect = async (file: File | null | undefined) => {
@@ -437,6 +475,19 @@ export default function TripFormModal({ isOpen, onClose, onSave, trip, onCoverUp
       <form onSubmit={handleSubmit} className={pendingDateShift ? 'hidden' : 'space-y-4'} onPaste={handlePaste}>
         {error && (
           <div className="p-3 bg-danger-soft border border-danger/30 rounded-xl text-body text-danger">{error}</div>
+        )}
+
+        {!isEditing && (
+          <VoyaPlanComposer
+            initialDestination={formData.title}
+            startDate={formData.start_date}
+            endDate={formData.end_date}
+            dayCount={formData.day_count}
+            currency={formData.currency}
+            travelers={1 + selectedMembers.length}
+            reminderDays={formData.reminder_days}
+            onCreated={handleVoyaCreated}
+          />
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 items-start">
