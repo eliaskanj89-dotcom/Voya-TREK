@@ -198,6 +198,22 @@ export class VoyaAiController {
     }
   }
 
+  @Post('transport-advice')
+  async transportAdvice(@CurrentUser() user: User, @Body() body: VoyaTransportAdviceDto) {
+    try {
+      return await this.voya.transportAdvice(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_TRANSPORT_UNAVAILABLE' }, 422);
+      }
+      console.error('Voya transport advice failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not compare this transfer right now', code: 'VOYA_TRANSPORT_ERROR' }, 500);
+    }
+  }
+
   @Post('day-edit-draft')
   async dayEditDraft(@CurrentUser() user: User, @Body() body: VoyaDayEditDto) {
     try {
