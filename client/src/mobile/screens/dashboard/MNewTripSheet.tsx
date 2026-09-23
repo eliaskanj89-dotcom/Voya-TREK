@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { Archive, ArchiveRestore, Camera, Search, X } from 'lucide-react'
 import { useTranslation } from '../../../i18n'
 import { tripsApi } from '../../../api/client'
@@ -15,6 +16,7 @@ import { MAX_TRIP_DAYS, tripSpanDays, type Trip, type TripCreateRequest } from '
 import MSheet from '../../components/MSheet'
 import MIconBtn from '../../components/MIconBtn'
 import MListRow from '../../components/MListRow'
+import MVoyaPlanComposer from './MVoyaPlanComposer'
 
 interface CoverSearchPhoto {
   id: string
@@ -50,6 +52,7 @@ function FieldLabel({ children }: { children: React.ReactNode }): React.ReactEle
  */
 export default function MNewTripSheet({ open, trip, initialDestination, initialDayCount, onClose, onSave, onCoverUpdate, onArchive }: MNewTripSheetProps): React.ReactElement {
   const isEditing = !!trip
+  const navigate = useNavigate()
   const { t } = useTranslation()
   const toast = useToast()
   const can = useCanDo()
@@ -109,6 +112,28 @@ export default function MNewTripSheet({ open, trip, initialDestination, initialD
       setEndDate(value)
     }
     setStartDate(value)
+  }
+
+  const handleVoyaCreated = async (created: Trip) => {
+    if (pendingCoverFile) {
+      try {
+        const fd = new FormData()
+        fd.append('cover', pendingCoverFile)
+        const data = await tripsApi.uploadCover(created.id, fd)
+        onCoverUpdate?.(created.id, data.cover_image)
+      } catch {
+        toast.error(t('dashboard.coverUploadError'))
+      }
+    } else if (pendingUnsplashUrl) {
+      try {
+        await tripsApi.update(created.id, { cover_image: pendingUnsplashUrl })
+        onCoverUpdate?.(created.id, pendingUnsplashUrl)
+      } catch {
+        toast.error(t('dashboard.coverSaveError'))
+      }
+    }
+    onClose()
+    navigate(`/trips/${created.id}`)
   }
 
   const handleSave = async () => {
@@ -257,6 +282,17 @@ export default function MNewTripSheet({ open, trip, initialDestination, initialD
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {!isEditing && (
+          <MVoyaPlanComposer
+            destination={title}
+            startDate={startDate}
+            endDate={endDate}
+            dayCount={Number.isInteger(initialDayCount) && (initialDayCount ?? 0) > 0 ? initialDayCount! : 7}
+            currency={currency}
+            autoExpand={!!initialDestination}
+            onCreated={handleVoyaCreated}
+          />
+        )}
         {error && (
           <div className="mb-3 rounded-[14px] bg-[color:var(--m-ic)] p-[11px_12px] text-[0.75rem] font-semibold text-[color:var(--m-st-danger)]">
             {error}
