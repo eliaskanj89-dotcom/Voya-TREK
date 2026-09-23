@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, CheckCircle2, Circle, ListTodo, RefreshCw, ShieldCheck, Sparkles, X } from 'lucide-react'
 import type { VoyaReadinessItem, VoyaReadinessResult, VoyaReadinessStatus } from '@trek/shared'
 import Modal from '../shared/Modal'
-import { voyaAiApi } from '../../api/client'
+import { todoApi, voyaAiApi } from '../../api/client'
 import { getApiErrorMessage } from '../../types'
 
 interface VoyaReadinessPanelProps {
@@ -22,8 +22,18 @@ export default function VoyaReadinessPanel({ tripId }: VoyaReadinessPanelProps) 
   const load = async () => {
     setLoading(true)
     try {
-      const result = await voyaAiApi.readiness({ tripId })
+      const [result, todos] = await Promise.all([
+        voyaAiApi.readiness({ tripId }),
+        todoApi.list(tripId).catch(() => ({ items: [] })),
+      ])
       setData(result)
+      const linked = new Set<number>()
+      for (const task of todos?.items || []) {
+        const description = typeof task?.description === 'string' ? task.description : ''
+        const match = description.match(/\[voya-readiness:(\d+)\]/)
+        if (match) linked.add(Number(match[1]))
+      }
+      setTaskItemIds(linked)
       setError('')
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Voya could not load trip readiness.'))
