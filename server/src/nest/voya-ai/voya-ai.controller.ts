@@ -154,6 +154,22 @@ export class VoyaAiController {
     }
   }
 
+  @Post('apply-trip-edit')
+  applyTripEdit(@CurrentUser() user: User, @Body() body: VoyaApplyTripEditDto) {
+    try {
+      return this.voya.applyTripEdit(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_STALE_TRIP_EDIT' }, 409);
+      }
+      console.error('Voya whole-trip apply failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not apply this whole-trip edit', code: 'VOYA_AI_APPLY_TRIP_EDIT_ERROR' }, 500);
+    }
+  }
+
   @Post('day-edit-draft')
   async dayEditDraft(@CurrentUser() user: User, @Body() body: VoyaDayEditDto) {
     try {
