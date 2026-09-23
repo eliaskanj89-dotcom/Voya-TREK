@@ -39,5 +39,5 @@ jobs:
       - name: Lint workspaces
         run: npm run lint
 
-      - name: Voya multi-city invariants
-        run: npm run test --workspace=server -- tests/unit/nest/voya-ai-multicity.test.ts
+      - name: Voya itinerary invariants
+        run: npm run test --workspace=server -- tests/unit/nest/voya-ai-multicity.test.ts tests/unit/nest/voya-ai-trip-edit.test.ts
