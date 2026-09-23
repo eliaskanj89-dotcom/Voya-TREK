@@ -404,6 +404,8 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
           activeTab={activeTab}
           onChange={handleTabChange}
         />
+      </div>
+
       {/* Offset by navbar + tab bar (44px) */}
       <div className="voya-planner-stage" style={{ position: 'fixed', top: 'calc(var(--nav-h) + 44px)', left: 0, right: 0, bottom: 0, overflow: 'hidden', overscrollBehavior: 'contain' }}>
 
