@@ -34,6 +34,7 @@ import ErrorBoundary from '../components/shared/ErrorBoundary'
 import { lazyWithRetry } from '../utils/lazyWithRetry'
 import { getDayBookendHotels } from '../utils/dayOrder'
 import TripWarningsBanner from '../components/Planner/TripWarningsBanner'
+import VoyaReadinessPanel from '../components/Planner/VoyaReadinessPanel'
 import Navbar from '../components/Layout/Navbar'
 import { useToast } from '../components/shared/Toast'
 import { Map, X, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Ticket, PackageCheck, Wallet, FolderOpen, Users, Train } from 'lucide-react'
@@ -411,6 +412,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
         {/* Plugin validation/warning contributions (#1429) — navbar chips for
             plugins with a tab here, floating bottom overlay for the rest. */}
         <TripWarningsBanner tripId={tripId} onOpenPluginTab={(pid) => handleTabChange(`plugin:${pid}`)} />
+        <VoyaReadinessPanel tripId={tripId} />
 
         {activeTab === 'plan' && (
           <div style={{ position: 'absolute', inset: 0 }}>
