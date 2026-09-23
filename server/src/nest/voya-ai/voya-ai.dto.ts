@@ -1,4 +1,4 @@
-import { voyaApplyDayEditRequestSchema, voyaDayEditRequestSchema, voyaMaterializeDraftRequestSchema, voyaMaterializeMultiCityDraftRequestSchema, voyaMultiCityPlanRequestSchema, voyaPlanDraftRequestSchema, voyaTripEditRequestSchema, voyaVerifyTripRequestSchema, voyaReadinessBuildRequestSchema, voyaReadinessStatusRequestSchema, voyaDestinationDiscoveryRequestSchema, voyaDestinationResolveRequestSchema } from '@trek/shared';
+import { voyaApplyDayEditRequestSchema, voyaApplyTripEditRequestSchema, voyaDayEditRequestSchema, voyaEditHistoryRequestSchema, voyaMaterializeDraftRequestSchema, voyaMaterializeMultiCityDraftRequestSchema, voyaMultiCityPlanRequestSchema, voyaPlanDraftRequestSchema, voyaRestoreEditSnapshotRequestSchema, voyaTripEditRequestSchema, voyaVerifyTripRequestSchema, voyaReadinessBuildRequestSchema, voyaReadinessStatusRequestSchema, voyaDestinationDiscoveryRequestSchema, voyaDestinationResolveRequestSchema } from '@trek/shared';
 import { createZodDto } from 'nestjs-zod';
 
 export class VoyaPlanDraftDto extends createZodDto(voyaPlanDraftRequestSchema) {}
