@@ -887,6 +887,74 @@ export class VoyaAiService {
     }
   }
 
+  private createEditSnapshot(
+    userId: number,
+    tripId: number,
+    dayIds: number[],
+    scope: 'day' | 'trip',
+    label: string,
+    prune = true,
+  ): number {
+    const uniqueDayIds = [...new Set(dayIds)];
+    const days = uniqueDayIds.map(dayId => {
+      const day = this.db.get<Record<string, unknown> & { id: number }>(
+        'SELECT * FROM days WHERE id = ? AND trip_id = ?',
+        dayId,
+        tripId,
+      );
+      if (!day) throw new VoyaAiInvalidDraftError('Day ' + dayId + ' does not exist');
+
+      const assignments = this.db.all<Record<string, unknown> & { id: number }>(
+        'SELECT * FROM day_assignments WHERE day_id = ? ORDER BY order_index, id',
+        dayId,
+      );
+      const assignmentIds = assignments.map(assignment => assignment.id);
+      const marks = assignmentIds.map(() => '?').join(',');
+      const participants = assignmentIds.length
+        ? this.db.all<{ assignment_id: number; user_id: number }>(
+            'SELECT assignment_id, user_id FROM assignment_participants WHERE assignment_id IN (' + marks + ') ORDER BY assignment_id, user_id',
+            ...assignmentIds,
+          )
+        : [];
+      const reservationLinks = assignmentIds.length
+        ? this.db.all<{ reservation_id: number; assignment_id: number }>(
+            'SELECT id AS reservation_id, assignment_id FROM reservations WHERE trip_id = ? AND assignment_id IN (' + marks + ') ORDER BY id',
+            tripId,
+            ...assignmentIds,
+          )
+        : [];
+
+      return { day, assignments, participants, reservationLinks };
+    });
+
+    const result = this.db.run(
+      'INSERT INTO voya_edit_snapshots (trip_id, user_id, scope, label, affected_day_ids, snapshot_json) VALUES (?, ?, ?, ?, ?, ?)',
+      tripId,
+      userId,
+      scope,
+      label.slice(0, 180),
+      JSON.stringify(uniqueDayIds),
+      JSON.stringify({ version: 1, days }),
+    );
+    const snapshotId = Number(result.lastInsertRowid);
+    if (prune) this.pruneEditSnapshots(tripId);
+    return snapshotId;
+  }
+
+  private pruneEditSnapshots(tripId: number, preserveId?: number): void {
+    const keep = this.db.all<{ id: number }>(
+      'SELECT id FROM voya_edit_snapshots WHERE trip_id = ? ORDER BY created_at DESC, id DESC LIMIT 20',
+      tripId,
+    ).map(row => row.id);
+    if (preserveId && !keep.includes(preserveId)) keep.push(preserveId);
+    if (!keep.length) return;
+    const marks = keep.map(() => '?').join(',');
+    this.db.run(
+      'DELETE FROM voya_edit_snapshots WHERE trip_id = ? AND id NOT IN (' + marks + ')',
+      tripId,
+      ...keep,
+    );
+  }
   private applyDayEditMutation(
     draft: VoyaDayEditDraft,
     current: ReturnType<AssignmentsService['listDayAssignments']>,
