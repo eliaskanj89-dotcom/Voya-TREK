@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, Check, MapPin, Sparkles, WandSparkles } from 'lucide-react'
+import { ArrowRight, Check, MapPin, Sparkles } from 'lucide-react'
 import type { Trip, VoyaPlanDraftRequest, VoyaPlanDraftResponse } from '@trek/shared'
 import { tripSpanDays } from '@trek/shared'
 import { voyaAiApi } from '../../api/client'
@@ -133,7 +133,7 @@ export default function VoyaPlanComposer({
       <div className="flex items-start justify-between gap-4 border-b border-[#94B8E8]/15 px-5 py-5 dark:border-white/8">
         <div className="flex min-w-0 items-start gap-3.5">
           <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-[#377CF6] text-white shadow-[0_10px_24px_rgba(55,124,246,.28)]">
-            <WandSparkles size={19} strokeWidth={2.2} />
+            <Sparkles size={19} strokeWidth={2.2} />
           </span>
           <div>
             <h3 className="voya-editorial text-[23px] font-medium tracking-[-.04em] text-content">Design the trip with Voya</h3>
