@@ -397,3 +397,49 @@ export const voyaRestoreEditSnapshotRequestSchema = z.object({
   snapshotId: z.number().int().positive(),
 });
 export type VoyaRestoreEditSnapshotRequest = z.infer<typeof voyaRestoreEditSnapshotRequestSchema>;
+
+
+export const voyaTransportAdviceRequestSchema = z.object({
+  tripId: z.number().int().positive(),
+  dayId: z.number().int().positive(),
+  origin: z.string().trim().min(2).max(160),
+  destination: z.string().trim().min(2).max(160),
+  departureDate: z.string().regex(isoDate).optional(),
+  departureTime: z.string().regex(time24).optional(),
+  lang: z.string().trim().max(12).optional(),
+});
+export type VoyaTransportAdviceRequest = z.infer<typeof voyaTransportAdviceRequestSchema>;
+
+export const voyaTransportAdviceOptionSchema = z.object({
+  id: z.string().trim().min(1).max(120),
+  mode: z.enum(['transit', 'drive', 'flight_handoff']),
+  label: z.string().trim().min(1).max(120),
+  durationMin: z.number().int().positive().nullable(),
+  durationLabel: z.string().trim().min(1).max(120),
+  distanceKm: z.number().nonnegative().nullable(),
+  transfers: z.number().int().nonnegative().nullable(),
+  departurePoint: z.string().trim().max(180).nullable(),
+  arrivalPoint: z.string().trim().max(180).nullable(),
+  departureTime: z.string().trim().max(80).nullable(),
+  arrivalTime: z.string().trim().max(80).nullable(),
+  operatorLabel: z.string().trim().max(180).nullable(),
+  source: z.string().trim().min(1).max(80),
+  sourceBacked: z.boolean(),
+  liveFareAvailable: z.boolean(),
+  fareLabel: z.string().trim().min(1).max(120),
+  recommended: z.boolean(),
+  notes: z.array(z.string().trim().min(1).max(220)).max(5),
+});
+export type VoyaTransportAdviceOption = z.infer<typeof voyaTransportAdviceOptionSchema>;
+
+export const voyaTransportAdviceResultSchema = z.object({
+  tripId: z.number().int().positive(),
+  origin: z.string(),
+  destination: z.string(),
+  checkedAt: z.string(),
+  summary: z.string().trim().min(1).max(500),
+  transitProvider: z.string().nullable(),
+  options: z.array(voyaTransportAdviceOptionSchema).min(1).max(6),
+  cautions: z.array(z.string().trim().min(1).max(220)).max(5),
+});
+export type VoyaTransportAdviceResult = z.infer<typeof voyaTransportAdviceResultSchema>;
