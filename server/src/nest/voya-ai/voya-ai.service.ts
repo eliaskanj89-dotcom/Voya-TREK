@@ -617,8 +617,6 @@ export class VoyaAiService {
         time: assignment.place?.place_time || null,
         durationMin: assignment.place?.duration_minutes ?? null,
         notes: assignment.place?.notes || assignment.notes || null,
-        reservationStatus: assignment.reservation_status || null,
-        reservationNotes: assignment.reservation_notes || null,
         accommodationLinked: assignment.accommodation_id != null,
       })),
     }));
@@ -685,13 +683,14 @@ export class VoyaAiService {
     const config = this.configResolver.resolve(user.id);
     if (!config) throw new VoyaAiUnavailableError();
     const travelerDna = this.travelerDna(user.id);
+    const tripTitle = this.trips.get(request.tripId, user.id)?.title || 'Untitled trip';
 
     let repair = '';
     for (let attempt = 0; attempt < 2; attempt++) {
       const raw = await this.generator.generate(config, {
         system: TRIP_EDIT_SYSTEM_PROMPT,
         user: [
-          `Trip: ${trip.title || 'Untitled trip'}.`,
+          `Trip: ${tripTitle}.`,
           `Traveler instruction: ${request.instruction}`,
           this.travelerDnaPrompt(travelerDna),
           'Current trip days:',
@@ -738,6 +737,7 @@ export class VoyaAiService {
     const config = this.configResolver.resolve(user.id);
     if (!config) throw new VoyaAiUnavailableError();
     const travelerDna = this.travelerDna(user.id);
+    const tripTitle = this.trips.get(request.tripId, user.id)?.title || 'Untitled trip';
 
     const context = current.map(a => ({
       assignmentId: a.id,
@@ -757,7 +757,7 @@ export class VoyaAiService {
       const raw = await this.generator.generate(config, {
         system: DAY_EDIT_SYSTEM_PROMPT,
         user: [
-          `Trip: ${trip.title || 'Untitled trip'}.`,
+          `Trip: ${tripTitle}.`,
           `Day ${day.day_number || ''}${day.date ? ` on ${day.date}` : ''}.`,
           day.title ? `Current day title: ${day.title}.` : '',
           day.notes ? `Current day notes: ${day.notes}` : '',
@@ -813,7 +813,7 @@ export class VoyaAiService {
 
     const mutation = this.db.transaction(() => {
       const snapshotId = this.createEditSnapshot(user.id, draft.tripId, [draft.dayId], 'day', `Before Voya day edit: ${draft.summary.slice(0, 120)}`);
-      const applied = this.applyDayEditMutation(draft, current, day, trip.title || 'this trip');
+      const applied = this.applyDayEditMutation(draft, current, day, this.trips.get(draft.tripId, user.id)?.title || 'this trip');
       this.stampEditSnapshotPostFingerprint(snapshotId, draft.tripId, [draft.dayId]);
       return applied;
     });
@@ -846,7 +846,7 @@ export class VoyaAiService {
     const mutations = this.db.transaction(() => {
       const snapshotId = this.createEditSnapshot(user.id, tripId, expectedDayIds, 'trip', `Before Voya whole-trip edit: ${parsed.plan.summary.slice(0, 120)}`);
       const applied = contexts.map(({ draft, day, current }) =>
-        this.applyDayEditMutation(draft, current, day, trip.title || 'this trip'),
+        this.applyDayEditMutation(draft, current, day, this.trips.get(tripId, user.id)?.title || 'this trip'),
       );
       this.stampEditSnapshotPostFingerprint(snapshotId, tripId, expectedDayIds);
       return applied;
@@ -1798,6 +1798,27 @@ const GENERIC_ACTIVITY_NAMES = new Set([
   'dinner',
   'breakfast',
 ]);
+
+const MULTI_CITY_SYSTEM_PROMPT = `You are Voya, a premium multi-city travel-planning engine.
+Build one coherent journey across the requested real destinations.
+Allocate the exact requested number of days, keep each destination's days contiguous, and make the first day after each city change a realistic transfer day.
+Recommend only qualitative transfer modes unless exact facts are supplied. Never invent live schedules, fares, availability, train or flight numbers.
+All specific places are suggestions until verified. Never invent exact prices, opening hours, reservations, visa rules, or live conditions.
+Return only the requested structured multi-city itinerary object.`;
+
+const TRIP_EDIT_SYSTEM_PROMPT = `You are Voya editing an existing trip at whole-trip scope.
+Choose only the days that materially need changes to satisfy the traveler.
+Preserve strong existing plans and all protected booked or hotel-linked stops.
+Do not invent day ids, live availability, opening hours, exact prices, or reservation status.
+Return only the requested structured whole-trip edit plan.`;
+
+const DAY_EDIT_SYSTEM_PROMPT = `You are Voya editing one day of an existing travel itinerary.
+Preserve good existing plans unless the traveler's instruction requires change.
+Never invent assignment ids. Every existing assignment must be explicitly kept or removed from this day.
+Protected booked or hotel-linked assignments must remain unchanged.
+New places are suggestions only and must never be presented as verified facts.
+Do not invent live availability, opening hours, reservation status, exact prices, or transport schedules.
+Return only the requested structured day-edit object.`;
 
 const SYSTEM_PROMPT = `You are Voya, a premium travel-planning engine.
 Create practical, human-paced itineraries that feel intentionally designed rather than mechanically filled.
