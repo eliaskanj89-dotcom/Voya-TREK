@@ -28,7 +28,7 @@ import {
   type TripCreateRequest, type TripUpdateRequest, type TripCopyRequest, type ActiveTripResponse,
   type VoyaPlanDraftRequest, type VoyaPlanDraftResponse, type VoyaApplyDayEditRequest, type VoyaApplyTripEditRequest, type VoyaDayEditDraft, type VoyaDayEditRequest,
   type VoyaMaterializeDraftRequest, type VoyaMaterializeMultiCityDraftRequest, type VoyaMultiCityPlanDraft, type VoyaMultiCityPlanRequest, type VoyaTripEditPlan, type VoyaTripEditRequest, type VoyaVerifyTripRequest, type VoyaVerifyTripResult,
-  type VoyaReadinessBuildRequest, type VoyaReadinessResult, type VoyaReadinessStatusRequest,
+  type VoyaReadinessBuildRequest, type VoyaReadinessResult, type VoyaReadinessStatusRequest, type VoyaReadinessToTodoRequest, type VoyaReadinessToTodoResult,
   type VoyaDestinationDiscoveryRequest, type VoyaDestinationDiscoveryResult,
   type Trip, type Day,
   type DayCreateRequest, type DayUpdateRequest, type DayReorderRequest,
@@ -422,6 +422,8 @@ export const voyaAiApi = {
     apiClient.post('/voya-ai/readiness-refresh', data, { timeout: 120000 }).then(r => r.data),
   updateReadinessStatus: (data: VoyaReadinessStatusRequest): Promise<VoyaReadinessResult> =>
     apiClient.post('/voya-ai/readiness-status', data).then(r => r.data),
+  readinessToTodo: (data: VoyaReadinessToTodoRequest): Promise<VoyaReadinessToTodoResult> =>
+    apiClient.post('/voya-ai/readiness-to-todo', data).then(r => r.data),
   planDraft: (data: VoyaPlanDraftRequest): Promise<{ draft: VoyaPlanDraftResponse }> =>
     apiClient.post('/voya-ai/plan-draft', data, { timeout: 120000 }).then(r => r.data),
   planMultiCityDraft: (data: VoyaMultiCityPlanRequest): Promise<{ draft: VoyaMultiCityPlanDraft }> =>
