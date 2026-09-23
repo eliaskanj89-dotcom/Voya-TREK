@@ -3,7 +3,7 @@ import type { User } from '../../types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StructuredGenerationError } from './structured-generation.service';
-import { VoyaApplyDayEditDto, VoyaDayEditDto, VoyaMaterializeDraftDto, VoyaPlanDraftDto, VoyaTripEditDto, VoyaVerifyTripDto, VoyaReadinessBuildDto, VoyaReadinessStatusDto, VoyaDestinationDiscoveryDto } from './voya-ai.dto';
+import { VoyaApplyDayEditDto, VoyaDayEditDto, VoyaMaterializeDraftDto, VoyaMaterializeMultiCityDraftDto, VoyaMultiCityPlanDto, VoyaPlanDraftDto, VoyaTripEditDto, VoyaVerifyTripDto, VoyaReadinessBuildDto, VoyaReadinessStatusDto, VoyaDestinationDiscoveryDto } from './voya-ai.dto';
 import {
   VoyaAiInvalidDraftError,
   VoyaAiPermissionError,
@@ -78,6 +78,41 @@ export class VoyaAiController {
         throw new HttpException({ error: error.message, code: 'VOYA_READINESS_ITEM_NOT_FOUND' }, 404);
       }
       throw new HttpException({ error: 'Voya could not update readiness', code: 'VOYA_READINESS_ERROR' }, 500);
+    }
+  }
+
+  @Post('multi-city-draft')
+  async multiCityDraft(@CurrentUser() user: User, @Body() body: VoyaMultiCityPlanDto) {
+    try {
+      return { draft: await this.voya.planMultiCityDraft(user.id, body) };
+    } catch (error) {
+      if (error instanceof VoyaAiUnavailableError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_NOT_CONFIGURED' }, 409);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_INVALID_MULTI_CITY_DRAFT' }, 502);
+      }
+      if (error instanceof StructuredGenerationError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_PROVIDER_ERROR' }, 502);
+      }
+      console.error('Voya multi-city planning failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not generate this multi-city trip right now', code: 'VOYA_AI_MULTI_CITY_ERROR' }, 500);
+    }
+  }
+
+  @Post('materialize-multi-city-draft')
+  materializeMultiCityDraft(@CurrentUser() user: User, @Body() body: VoyaMaterializeMultiCityDraftDto) {
+    try {
+      return this.voya.materializeMultiCityDraft(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_INVALID_MULTI_CITY_DRAFT' }, 400);
+      }
+      console.error('Voya multi-city materialization failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not create this multi-city trip', code: 'VOYA_AI_MULTI_CITY_MATERIALIZE_ERROR' }, 500);
     }
   }
 
