@@ -8,6 +8,8 @@ import { DaysModule } from '../days/days.module';
 import { PlacesModule } from '../places/places.module';
 import { AssignmentsDomainModule } from '../assignments/assignments-domain.module';
 import { MapsModule } from '../maps/maps.module';
+import { TransitModule } from '../transit/transit.module';
+import { RoadtripModule } from '../roadtrip/roadtrip.module';
 import { SettingsModule } from '../settings/settings.module';
 
 @Module({
