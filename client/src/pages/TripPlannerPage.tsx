@@ -378,6 +378,16 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
   // corridor starts past that margin.
   const leftPanelPx = leftHidden ? 0 : leftWidth
   const rightPanelPx = rightHidden ? 0 : rightWidth
+  useEffect(() => {
+    const onOpenReservations = (event: Event) => {
+      const detail = (event as CustomEvent<{ tripId?: number }>).detail
+      if (detail?.tripId !== tripId) return
+      handleTabChange('buchungen')
+    }
+    window.addEventListener('voya:open-reservations', onOpenReservations)
+    return () => window.removeEventListener('voya:open-reservations', onOpenReservations)
+  }, [tripId, handleTabChange])
+
   const mapInsetLeft = leftPanelPx ? leftPanelPx + 10 : 0
   const mapInsetRight = rightPanelPx ? rightPanelPx + 10 : 0
 
