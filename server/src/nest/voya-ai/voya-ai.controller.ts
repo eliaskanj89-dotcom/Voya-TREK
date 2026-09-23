@@ -3,7 +3,7 @@ import type { User } from '../../types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StructuredGenerationError } from './structured-generation.service';
-import { VoyaApplyDayEditDto, VoyaDayEditDto, VoyaEditHistoryDto, VoyaMaterializeDraftDto, VoyaMaterializeMultiCityDraftDto, VoyaMultiCityPlanDto, VoyaPlanDraftDto, VoyaRestoreEditSnapshotDto, VoyaTripEditDto, VoyaVerifyTripDto, VoyaReadinessBuildDto, VoyaReadinessStatusDto, VoyaDestinationDiscoveryDto } from './voya-ai.dto';
+import { VoyaApplyDayEditDto, VoyaApplyTripEditDto, VoyaDayEditDto, VoyaEditHistoryDto, VoyaMaterializeDraftDto, VoyaMaterializeMultiCityDraftDto, VoyaMultiCityPlanDto, VoyaPlanDraftDto, VoyaRestoreEditSnapshotDto, VoyaTripEditDto, VoyaVerifyTripDto, VoyaReadinessBuildDto, VoyaReadinessStatusDto, VoyaDestinationDiscoveryDto } from './voya-ai.dto';
 import {
   VoyaAiInvalidDraftError,
   VoyaAiPermissionError,
