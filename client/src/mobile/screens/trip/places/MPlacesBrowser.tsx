@@ -22,6 +22,7 @@ import type { Place } from '../../../../types'
 import MPlacesBulkCategorySheet from './MPlacesBulkCategorySheet'
 import MPlacesSaveToCollectionSheet from './MPlacesSaveToCollectionSheet'
 import { filterPool, firstPlannedDayNumbers, plannedPlaceIds } from './placesBrowserModel'
+import { getVoyaPlaceTrust } from '../../../../utils/voyaTrust'
 
 /**
  * Fullscreen places pool (mode === 'browse'): All/Unplanned/Tracks filter
@@ -408,6 +409,7 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
             const CatIcon = getCategoryIcon(cat?.icon)
             const dayNumber = dayNumberByPlace.get(place.id)
             const sub = place.address || place.description
+            const voyaTrust = getVoyaPlaceTrust(place)
             return (
               <div key={place.id} className="voya-mobile-place-row flex items-center gap-[11px] border border-[color:var(--m-rowbr)] px-[10px] py-[10px]">
                 <button type="button" onClick={() => openRow(place)} className="flex min-w-0 flex-1 items-center gap-[11px] text-left">
@@ -427,6 +429,17 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
                       <CatIcon size={12} strokeWidth={2.2} className="flex-none" style={{ color: cat?.color || 'var(--m-muted)' }} />
                       <span className="truncate text-[0.8125rem] font-semibold text-m-ink">{place.name}</span>
                     </span>
+                    {voyaTrust && (
+                      <div className="mt-1">
+                        <span className={`inline-flex rounded-full px-2 py-[2px] font-geist text-[0.53125rem] font-bold uppercase tracking-[.06em] ${
+                          voyaTrust === 'matched'
+                            ? 'bg-[#198754]/10 text-[#198754]'
+                            : 'bg-[#F59E0B]/10 text-[#A16207] dark:text-[#FBBF24]'
+                        }`}>
+                          {voyaTrust === 'matched' ? 'Provider matched' : 'Voya suggestion'}
+                        </span>
+                      </div>
+                    )}
                     {sub && (
                       <MarkdownText clamp className="mt-px font-geist text-[0.65625rem] text-m-muted">{sub}</MarkdownText>
                     )}
