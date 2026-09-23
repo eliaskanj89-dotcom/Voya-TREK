@@ -146,3 +146,25 @@ export const voyaApplyDayEditRequestSchema = z.object({
   draft: voyaDayEditDraftSchema,
 });
 export type VoyaApplyDayEditRequest = z.infer<typeof voyaApplyDayEditRequestSchema>;
+
+
+export const voyaTripEditRequestSchema = z.object({
+  tripId: z.number().int().positive(),
+  instruction: z.string().trim().min(3).max(1600),
+});
+export type VoyaTripEditRequest = z.infer<typeof voyaTripEditRequestSchema>;
+
+export const voyaTripEditPlanSchema = z.object({
+  tripId: z.number().int().positive(),
+  summary: z.string().trim().min(1).max(900),
+  affectedDays: z.array(z.object({
+    dayId: z.number().int().positive(),
+    reason: z.string().trim().min(1).max(400),
+    instruction: z.string().trim().min(3).max(1000),
+  })).min(1).max(30),
+  generatedBy: z.object({
+    provider: z.enum(['local', 'openai', 'anthropic']),
+    model: z.string().min(1),
+  }),
+});
+export type VoyaTripEditPlan = z.infer<typeof voyaTripEditPlanSchema>;
