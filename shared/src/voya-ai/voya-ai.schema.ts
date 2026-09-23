@@ -368,3 +368,32 @@ export const voyaMaterializeMultiCityDraftRequestSchema = z.object({
   reminderDays: z.number().int().min(0).max(30).optional().default(0),
 });
 export type VoyaMaterializeMultiCityDraftRequest = z.infer<typeof voyaMaterializeMultiCityDraftRequestSchema>;
+
+
+export const voyaEditSnapshotSummarySchema = z.object({
+  id: z.number().int().positive(),
+  tripId: z.number().int().positive(),
+  scope: z.enum(['day', 'trip']),
+  label: z.string().trim().min(1).max(180),
+  affectedDayIds: z.array(z.number().int().positive()),
+  createdAt: z.string(),
+  restoredAt: z.string().nullable(),
+});
+export type VoyaEditSnapshotSummary = z.infer<typeof voyaEditSnapshotSummarySchema>;
+
+export const voyaEditHistoryRequestSchema = z.object({
+  tripId: z.number().int().positive(),
+});
+export type VoyaEditHistoryRequest = z.infer<typeof voyaEditHistoryRequestSchema>;
+
+export const voyaEditHistoryResultSchema = z.object({
+  tripId: z.number().int().positive(),
+  snapshots: z.array(voyaEditSnapshotSummarySchema),
+});
+export type VoyaEditHistoryResult = z.infer<typeof voyaEditHistoryResultSchema>;
+
+export const voyaRestoreEditSnapshotRequestSchema = z.object({
+  tripId: z.number().int().positive(),
+  snapshotId: z.number().int().positive(),
+});
+export type VoyaRestoreEditSnapshotRequest = z.infer<typeof voyaRestoreEditSnapshotRequestSchema>;
