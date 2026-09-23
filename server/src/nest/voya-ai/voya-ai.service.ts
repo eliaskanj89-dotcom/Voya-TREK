@@ -812,8 +812,10 @@ export class VoyaAiService {
     this.assertDayEditDraft(draft, current);
 
     const mutation = this.db.transaction(() => {
-      this.createEditSnapshot(user.id, draft.tripId, [draft.dayId], 'day', `Before Voya day edit: ${draft.summary.slice(0, 120)}`);
-      return this.applyDayEditMutation(draft, current, day, trip.title || 'this trip');
+      const snapshotId = this.createEditSnapshot(user.id, draft.tripId, [draft.dayId], 'day', `Before Voya day edit: ${draft.summary.slice(0, 120)}`);
+      const applied = this.applyDayEditMutation(draft, current, day, trip.title || 'this trip');
+      this.stampEditSnapshotPostFingerprint(snapshotId, draft.tripId, [draft.dayId]);
+      return applied;
     });
 
     this.broadcastDayEditMutation(draft.tripId, draft.dayId, mutation);
@@ -841,10 +843,12 @@ export class VoyaAiService {
     });
 
     const mutations = this.db.transaction(() => {
-      this.createEditSnapshot(user.id, tripId, expectedDayIds, 'trip', `Before Voya whole-trip edit: ${parsed.plan.summary.slice(0, 120)}`);
-      return contexts.map(({ draft, day, current }) =>
+      const snapshotId = this.createEditSnapshot(user.id, tripId, expectedDayIds, 'trip', `Before Voya whole-trip edit: ${parsed.plan.summary.slice(0, 120)}`);
+      const applied = contexts.map(({ draft, day, current }) =>
         this.applyDayEditMutation(draft, current, day, trip.title || 'this trip'),
       );
+      this.stampEditSnapshotPostFingerprint(snapshotId, tripId, expectedDayIds);
+      return applied;
     });
 
     for (let index = 0; index < contexts.length; index++) {
@@ -940,6 +944,14 @@ export class VoyaAiService {
     const payload = parseEditSnapshotPayload(row.snapshot_json);
     const affectedDayIds = payload.days.map(entry => Number(entry.day.id)).filter(Number.isFinite);
     if (!affectedDayIds.length) throw new VoyaAiInvalidDraftError('Snapshot contains no restorable days');
+    if (payload.postFingerprint) {
+      const currentFingerprint = this.editStateFingerprint(request.tripId, affectedDayIds);
+      if (currentFingerprint !== payload.postFingerprint) {
+        throw new VoyaAiInvalidDraftError(
+          'This itinerary changed after the Voya edit. Restore was blocked to protect newer manual changes.',
+        );
+      }
+    }
 
     this.db.transaction(() => {
       this.createEditSnapshot(
@@ -1065,6 +1077,57 @@ export class VoyaAiService {
 
     return { tripId: request.tripId, snapshotId: request.snapshotId, restoredDays: affectedDayIds };
   }
+  private editStateFingerprint(tripId: number, dayIds: number[]): string {
+    const uniqueDayIds = [...new Set(dayIds)].sort((a, b) => a - b);
+    const days = uniqueDayIds.map(dayId => {
+      const day = this.db.get<Record<string, unknown>>(
+        'SELECT id, title, notes, default_transport_mode FROM days WHERE id = ? AND trip_id = ?',
+        dayId,
+        tripId,
+      );
+      if (!day) throw new VoyaAiInvalidDraftError('Day ' + dayId + ' does not exist');
+
+      const assignments = this.db.all<Record<string, unknown> & { id: number }>(
+        'SELECT * FROM day_assignments WHERE day_id = ? ORDER BY order_index, id',
+        dayId,
+      );
+      const assignmentIds = assignments.map(assignment => assignment.id);
+      const marks = assignmentIds.map(() => '?').join(',');
+      const participants = assignmentIds.length
+        ? this.db.all<{ assignment_id: number; user_id: number }>(
+            'SELECT assignment_id, user_id FROM assignment_participants WHERE assignment_id IN (' + marks + ') ORDER BY assignment_id, user_id',
+            ...assignmentIds,
+          )
+        : [];
+      const reservationLinks = assignmentIds.length
+        ? this.db.all<{ reservation_id: number; assignment_id: number }>(
+            'SELECT id AS reservation_id, assignment_id FROM reservations WHERE trip_id = ? AND assignment_id IN (' + marks + ') ORDER BY id',
+            tripId,
+            ...assignmentIds,
+          )
+        : [];
+      return { day, assignments, participants, reservationLinks };
+    });
+    return snapshotFingerprint(days);
+  }
+
+  private stampEditSnapshotPostFingerprint(snapshotId: number, tripId: number, dayIds: number[]): void {
+    const row = this.db.get<{ snapshot_json: string }>(
+      'SELECT snapshot_json FROM voya_edit_snapshots WHERE id = ? AND trip_id = ?',
+      snapshotId,
+      tripId,
+    );
+    if (!row) throw new VoyaAiInvalidDraftError('Voya edit snapshot disappeared during apply');
+    const payload = parseEditSnapshotPayload(row.snapshot_json);
+    payload.postFingerprint = this.editStateFingerprint(tripId, dayIds);
+    this.db.run(
+      'UPDATE voya_edit_snapshots SET snapshot_json = ? WHERE id = ? AND trip_id = ?',
+      JSON.stringify(payload),
+      snapshotId,
+      tripId,
+    );
+  }
+
   private createEditSnapshot(
     userId: number,
     tripId: number,
@@ -1834,12 +1897,23 @@ function isVoyaSuggestion(notes: string | null | undefined): boolean {
 
 interface VoyaEditSnapshotPayload {
   version: 1;
+  postFingerprint?: string;
   days: Array<{
     day: Record<string, unknown> & { id: number };
     assignments: Array<Record<string, unknown> & { id: number; order_index?: number | null }>;
     participants: Array<{ assignment_id: number; user_id: number }>;
     reservationLinks: Array<{ reservation_id: number; assignment_id: number }>;
   }>;
+}
+
+function snapshotFingerprint(value: unknown): string {
+  const input = JSON.stringify(value);
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
 function parseEditSnapshotPayload(value: string): VoyaEditSnapshotPayload {
