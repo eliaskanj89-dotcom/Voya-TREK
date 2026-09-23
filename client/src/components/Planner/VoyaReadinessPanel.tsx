@@ -46,6 +46,17 @@ export default function VoyaReadinessPanel({ tripId }: VoyaReadinessPanelProps) 
     void load()
   }, [tripId])
 
+  useEffect(() => {
+    const onOpenReadiness = (event: Event) => {
+      const detail = (event as CustomEvent<{ tripId?: number }>).detail
+      if (detail?.tripId !== tripId) return
+      setOpen(true)
+      void load()
+    }
+    window.addEventListener('voya:open-readiness', onOpenReadiness)
+    return () => window.removeEventListener('voya:open-readiness', onOpenReadiness)
+  }, [tripId])
+
   const refresh = async () => {
     if (refreshing) return
     setRefreshing(true)
