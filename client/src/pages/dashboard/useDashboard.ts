@@ -7,7 +7,7 @@ import { useTranslation } from '../../i18n'
 import { useToast } from '../../components/shared/Toast'
 import { getApiErrorMessage } from '../../types'
 import { localIsoToday } from './dashboardModel'
-import type { TripCreateRequest } from '@trek/shared'
+import type { TripCreateRequest, VoyaPlanDraftRequest } from '@trek/shared'
 import {
   type DashboardTrip,
   type TravelStats,
@@ -16,6 +16,14 @@ import {
   getTripStatus,
   sortTrips,
 } from './dashboardModel'
+
+export interface VoyaCreateSeed {
+  destination: string
+  days: number
+  budgetStyle?: VoyaPlanDraftRequest['budgetStyle']
+  interests?: string
+  notes?: string
+}
 
 /**
  * Dashboard data hook — owns every bit of the page's state, data loading and
@@ -29,7 +37,7 @@ export function useDashboard() {
   const [archivedTrips, setArchivedTrips] = useState<DashboardTrip[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [showForm, setShowForm] = useState<boolean>(false)
-  const [createSeed, setCreateSeed] = useState<{ destination: string; days: number } | null>(null)
+  const [createSeed, setCreateSeed] = useState<VoyaCreateSeed | null>(null)
   const [editingTrip, setEditingTrip] = useState<DashboardTrip | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('trek_dashboard_view') as 'grid' | 'list') || 'grid')
   const [deleteTrip, setDeleteTrip] = useState<DashboardTrip | null>(null)
@@ -60,10 +68,30 @@ export function useDashboard() {
     if (searchParams.get('create') === '1') {
       const destination = (searchParams.get('destination') || '').trim()
       const requestedDays = Number(searchParams.get('days'))
+      const budgetCandidate = searchParams.get('budgetStyle')
+      const budgetStyle: VoyaPlanDraftRequest['budgetStyle'] | undefined =
+        budgetCandidate === 'budget' || budgetCandidate === 'moderate' || budgetCandidate === 'premium' || budgetCandidate === 'luxury'
+          ? budgetCandidate
+          : undefined
+      const travelStyle = (searchParams.get('travelStyle') || '').trim()
+      const climate = (searchParams.get('climate') || '').trim()
+      const travelEffort = (searchParams.get('travelEffort') || '').trim()
+      const interests = (searchParams.get('interests') || '').trim()
+      const travelerNotes = (searchParams.get('notes') || '').trim()
+      const discoveryContext = [
+        travelStyle ? `Discovery vibe: ${travelStyle}.` : '',
+        climate && climate !== 'any' ? `Climate preference: ${climate}.` : '',
+        travelEffort ? `Travel effort preference: ${travelEffort}.` : '',
+        travelerNotes,
+      ].filter(Boolean).join(' ')
+
       setCreateSeed(destination
         ? {
             destination,
             days: Number.isInteger(requestedDays) && requestedDays >= 1 && requestedDays <= 30 ? requestedDays : 7,
+            budgetStyle,
+            interests: interests || undefined,
+            notes: discoveryContext || undefined,
           }
         : null)
       setEditingTrip(null)
