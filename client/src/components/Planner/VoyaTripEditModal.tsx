@@ -37,19 +37,23 @@ export default function VoyaTripEditModal({
   const [openDays, setOpenDays] = useState<Set<number>>(new Set())
   const [planning, setPlanning] = useState(false)
   const [previewingDay, setPreviewingDay] = useState<number | null>(null)
-  const [applyingDay, setApplyingDay] = useState<number | null>(null)
-  const [appliedDays, setAppliedDays] = useState<Set<number>>(new Set())
+  const [previewingAll, setPreviewingAll] = useState(false)
+  const [previewProgress, setPreviewProgress] = useState({ current: 0, total: 0 })
+  const [applyingAll, setApplyingAll] = useState(false)
   const [error, setError] = useState('')
 
   const dayById = useMemo(() => new Map(days.map(day => [day.id, day])), [days])
+  const busy = planning || previewingDay != null || previewingAll || applyingAll
+  const allReady = !!plan && plan.affectedDays.every(item => drafts[item.dayId] != null)
+  const readyCount = plan ? plan.affectedDays.filter(item => drafts[item.dayId] != null).length : 0
 
   const reset = () => {
-    if (planning || previewingDay != null || applyingDay != null) return
+    if (busy) return
     setInstruction('')
     setPlan(null)
     setDrafts({})
     setOpenDays(new Set())
-    setAppliedDays(new Set())
+    setPreviewProgress({ current: 0, total: 0 })
     setError('')
     onClose()
   }
@@ -64,7 +68,6 @@ export default function VoyaTripEditModal({
     setError('')
     setPlan(null)
     setDrafts({})
-    setAppliedDays(new Set())
     try {
       const result = await voyaAiApi.planTripEdit({ tripId, instruction: text })
       setPlan(result.plan)
@@ -94,27 +97,58 @@ export default function VoyaTripEditModal({
     }
   }
 
-  const applyDay = async (dayId: number) => {
-    const draft = drafts[dayId]
-    if (!draft) return
-    setApplyingDay(dayId)
+  const previewAll = async () => {
+    if (!plan) return
+    setPreviewingAll(true)
     setError('')
+    const missing = plan.affectedDays.filter(item => drafts[item.dayId] == null)
+    setPreviewProgress({ current: 0, total: missing.length })
+    const nextDrafts = { ...drafts }
+
     try {
-      await voyaAiApi.applyDayEdit({ draft })
-      await onDayApplied(dayId)
-      setAppliedDays(current => new Set(current).add(dayId))
+      for (let index = 0; index < missing.length; index++) {
+        const item = missing[index]
+        setPreviewProgress({ current: index + 1, total: missing.length })
+        const result = await voyaAiApi.planDayEdit({
+          tripId,
+          dayId: item.dayId,
+          instruction: item.instruction,
+        })
+        nextDrafts[item.dayId] = result.draft
+        setDrafts({ ...nextDrafts })
+      }
+      setOpenDays(new Set(plan.affectedDays.map(item => item.dayId)))
     } catch (err: unknown) {
       setError(getApiErrorMessage(
         err,
-        'This day changed after the preview. Generate a fresh preview before applying it.',
+        'Voya could not finish every day preview. Completed previews were kept; try the remaining days again.',
       ))
-      setDrafts(current => {
-        const next = { ...current }
-        delete next[dayId]
-        return next
-      })
     } finally {
-      setApplyingDay(null)
+      setPreviewingAll(false)
+      setPreviewProgress({ current: 0, total: 0 })
+    }
+  }
+
+  const applyAll = async () => {
+    if (!plan || !allReady) return
+    setApplyingAll(true)
+    setError('')
+    try {
+      const orderedDrafts = plan.affectedDays.map(item => drafts[item.dayId]).filter(Boolean)
+      await voyaAiApi.applyTripEdit({ plan, drafts: orderedDrafts })
+      await onDayApplied(plan.affectedDays[0]?.dayId ?? days[0]?.id ?? 0)
+      setInstruction('')
+      setPlan(null)
+      setDrafts({})
+      setOpenDays(new Set())
+      onClose()
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(
+        err,
+        'The trip changed after these previews were created. Nothing was applied. Refresh the affected previews and try again.',
+      ))
+    } finally {
+      setApplyingAll(false)
     }
   }
 
@@ -147,7 +181,7 @@ export default function VoyaTripEditModal({
             <div className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#377CF6]">{tripTitle}</div>
             <h3 className="voya-editorial mt-1 text-[30px] font-medium tracking-[-.045em] text-content">What should feel different?</h3>
             <p className="mt-2 max-w-2xl text-body leading-relaxed text-content-muted">
-              Voya will first decide which days actually need changes. Good days stay untouched.
+              Voya first decides which days actually need changes. Good days stay untouched.
             </p>
           </div>
 
@@ -175,7 +209,7 @@ export default function VoyaTripEditModal({
 
           <div className="flex items-center justify-between gap-4 border-t border-edge-faint pt-4">
             <p className="text-caption leading-relaxed text-content-faint">
-              Planning does not modify the trip. Each affected day is reviewed separately.
+              Planning does not modify the trip. You review every affected day before anything is applied.
             </p>
             <button
               type="button"
@@ -200,10 +234,18 @@ export default function VoyaTripEditModal({
       ) : (
         <div>
           <div className="mb-5 rounded-[22px] border border-[#BBD5F6]/35 bg-[linear-gradient(145deg,rgba(242,248,255,.92),rgba(255,255,255,.78))] p-4 dark:border-white/8 dark:bg-white/4">
-            <div className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#377CF6]">
-              {plan.affectedDays.length} day{plan.affectedDays.length === 1 ? '' : 's'} affected
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#377CF6]">
+                {plan.affectedDays.length} day{plan.affectedDays.length === 1 ? '' : 's'} affected
+              </div>
+              <div className="rounded-full bg-[#377CF6]/8 px-2.5 py-1 text-[10px] font-semibold text-[#377CF6]">
+                {readyCount}/{plan.affectedDays.length} reviewed
+              </div>
             </div>
             <p className="mt-2 text-body leading-relaxed text-content-muted">{plan.summary}</p>
+            <p className="mt-2 text-[10px] font-medium text-content-faint">
+              Whole-trip apply is atomic: if any reviewed day is stale or invalid, Voya applies nothing.
+            </p>
           </div>
 
           <div className="space-y-2.5">
@@ -213,7 +255,6 @@ export default function VoyaTripEditModal({
               const label = day?.title || `Day ${day?.day_number ?? dayIndex + 1}`
               const draft = drafts[item.dayId]
               const open = openDays.has(item.dayId)
-              const applied = appliedDays.has(item.dayId)
               const existing = assignments[String(item.dayId)] || []
 
               return (
@@ -224,9 +265,9 @@ export default function VoyaTripEditModal({
                     className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
                   >
                     <span className={`flex h-8 w-8 flex-none items-center justify-center rounded-full text-[11px] font-bold ${
-                      applied ? 'bg-emerald-500 text-white' : 'bg-[#377CF6]/10 text-[#377CF6]'
+                      draft ? 'bg-emerald-500 text-white' : 'bg-[#377CF6]/10 text-[#377CF6]'
                     }`}>
-                      {applied ? <Check size={14} strokeWidth={2.6} /> : (day?.day_number ?? dayIndex + 1)}
+                      {draft ? <Check size={14} strokeWidth={2.6} /> : (day?.day_number ?? dayIndex + 1)}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="voya-editorial block truncate text-[19px] font-medium tracking-[-.03em] text-content">{label}</span>
@@ -241,11 +282,11 @@ export default function VoyaTripEditModal({
                         {item.instruction}
                       </div>
 
-                      {!draft && !applied && (
+                      {!draft && (
                         <button
                           type="button"
                           onClick={() => { void previewDay(item.dayId, item.instruction) }}
-                          disabled={previewingDay != null}
+                          disabled={busy}
                           className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#377CF6]/25 bg-[#377CF6]/7 px-4 py-2 text-caption font-semibold text-[#377CF6] disabled:opacity-50"
                         >
                           {previewingDay === item.dayId ? (
@@ -262,7 +303,7 @@ export default function VoyaTripEditModal({
                         </button>
                       )}
 
-                      {draft && !applied && (
+                      {draft && (
                         <div className="mt-3">
                           <div className="space-y-1.5">
                             {draft.sequence.map((sequenceItem, index) => {
@@ -292,39 +333,20 @@ export default function VoyaTripEditModal({
                             </p>
                           )}
 
-                          <div className="mt-3 flex items-center justify-end gap-2">
+                          <div className="mt-3 flex justify-end">
                             <button
                               type="button"
+                              disabled={busy}
                               onClick={() => setDrafts(current => {
                                 const next = { ...current }
                                 delete next[item.dayId]
                                 return next
                               })}
-                              className="rounded-full border border-edge px-3 py-1.5 text-caption font-medium text-content-muted"
+                              className="rounded-full border border-edge px-3 py-1.5 text-caption font-medium text-content-muted disabled:opacity-50"
                             >
                               Regenerate
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => { void applyDay(item.dayId) }}
-                              disabled={applyingDay != null}
-                              className="inline-flex items-center gap-2 rounded-full bg-[#377CF6] px-4 py-2 text-caption font-semibold text-white shadow-[0_8px_20px_rgba(55,124,246,.22)] disabled:opacity-60"
-                            >
-                              {applyingDay === item.dayId ? (
-                                <>
-                                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/35 border-t-white" />
-                                  Applying…
-                                </>
-                              ) : 'Apply this day'}
-                            </button>
                           </div>
-                        </div>
-                      )}
-
-                      {applied && (
-                        <div className="mt-3 flex items-center gap-2 text-caption font-medium text-emerald-600 dark:text-emerald-400">
-                          <Check size={14} strokeWidth={2.5} />
-                          Applied. Other days remain unchanged until you approve them.
                         </div>
                       )}
                     </div>
@@ -334,22 +356,63 @@ export default function VoyaTripEditModal({
             })}
           </div>
 
-          <div className="mt-5 flex items-center justify-between gap-3 border-t border-edge-faint pt-4">
-            <p className="text-caption text-content-faint">No bulk apply: each day stays under your control.</p>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-edge-faint pt-4">
             <button
               type="button"
               onClick={() => {
+                if (busy) return
                 setPlan(null)
                 setDrafts({})
-                setAppliedDays(new Set())
                 setOpenDays(new Set())
                 setError('')
               }}
-              disabled={applyingDay != null}
-              className="rounded-full border border-edge px-4 py-2 text-caption font-medium text-content-secondary hover:bg-surface-hover"
+              disabled={busy}
+              className="rounded-full border border-edge px-4 py-2 text-caption font-medium text-content-secondary hover:bg-surface-hover disabled:opacity-50"
             >
               New trip request
             </button>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {!allReady && (
+                <button
+                  type="button"
+                  onClick={() => { void previewAll() }}
+                  disabled={busy}
+                  className="inline-flex items-center gap-2 rounded-full border border-[#377CF6]/25 bg-[#377CF6]/7 px-4 py-2 text-caption font-semibold text-[#377CF6] disabled:opacity-50"
+                >
+                  {previewingAll ? (
+                    <>
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#377CF6]/25 border-t-[#377CF6]" />
+                      Previewing {previewProgress.current}/{previewProgress.total}
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={13} />
+                      Preview remaining days
+                    </>
+                  )}
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => { void applyAll() }}
+                disabled={!allReady || busy}
+                className="inline-flex items-center gap-2 rounded-full bg-[#377CF6] px-5 py-2.5 text-caption font-semibold text-white shadow-[0_8px_20px_rgba(55,124,246,.22)] disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {applyingAll ? (
+                  <>
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/35 border-t-white" />
+                    Applying all…
+                  </>
+                ) : (
+                  <>
+                    <Check size={13} strokeWidth={2.5} />
+                    Apply all changes
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
