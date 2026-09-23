@@ -5257,6 +5257,27 @@ function runMigrations(db: Database.Database): void {
         );
       `);
     },
+    /*
+     * Persistent Voya AI edit history. Snapshots contain only itinerary/day state,
+     * never provider secrets or authentication data.
+     */
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS voya_edit_snapshots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          trip_id INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+          user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          scope TEXT NOT NULL CHECK(scope IN ('day', 'trip')),
+          label TEXT NOT NULL,
+          affected_day_ids TEXT NOT NULL,
+          snapshot_json TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          restored_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_voya_edit_snapshots_trip_created
+          ON voya_edit_snapshots(trip_id, created_at DESC, id DESC);
+      `);
+    },
   ];
 
   if (currentVersion < migrations.length) {
