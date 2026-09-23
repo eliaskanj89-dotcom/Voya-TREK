@@ -438,6 +438,10 @@ export const voyaAiApi = {
     apiClient.post('/voya-ai/day-edit-draft', data, { timeout: 120000 }).then(r => r.data),
   applyDayEdit: (data: VoyaApplyDayEditRequest) =>
     apiClient.post('/voya-ai/apply-day-edit', data, { timeout: 120000 }).then(r => r.data),
+  editHistory: (data: VoyaEditHistoryRequest): Promise<VoyaEditHistoryResult> =>
+    apiClient.post('/voya-ai/edit-history', data).then(r => r.data),
+  restoreEditSnapshot: (data: VoyaRestoreEditSnapshotRequest) =>
+    apiClient.post('/voya-ai/restore-edit-snapshot', data, { timeout: 120000 }).then(r => r.data),
   applyTripEdit: (data: VoyaApplyTripEditRequest): Promise<{ tripId: number; affectedDays: number[]; appliedDays: number }> =>
     apiClient.post('/voya-ai/apply-trip-edit', data, { timeout: 120000 }).then(r => r.data),
 }
