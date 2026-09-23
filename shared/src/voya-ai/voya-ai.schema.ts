@@ -77,3 +77,28 @@ export const voyaMaterializeDraftRequestSchema = z.object({
   reminderDays: z.number().int().min(0).max(30).optional().default(0),
 });
 export type VoyaMaterializeDraftRequest = z.infer<typeof voyaMaterializeDraftRequestSchema>;
+
+export const voyaVerifyTripRequestSchema = z.object({
+  tripId: z.number().int().positive(),
+  destination: z.string().trim().min(2).max(160).optional(),
+  lang: z.string().trim().max(35).optional(),
+});
+export type VoyaVerifyTripRequest = z.infer<typeof voyaVerifyTripRequestSchema>;
+
+export const voyaVerifyTripResultSchema = z.object({
+  tripId: z.number().int().positive(),
+  checked: z.number().int().nonnegative(),
+  verified: z.number().int().nonnegative(),
+  unresolved: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  sourceCounts: z.record(z.string(), z.number().int().nonnegative()),
+  items: z.array(z.object({
+    placeId: z.number().int().positive(),
+    name: z.string(),
+    status: z.enum(['verified', 'unresolved', 'already_verified', 'error']),
+    source: z.string().nullable(),
+    matchedName: z.string().nullable(),
+    reason: z.string(),
+  })),
+});
+export type VoyaVerifyTripResult = z.infer<typeof voyaVerifyTripResultSchema>;
