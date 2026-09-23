@@ -425,7 +425,7 @@ export default function MTripShell({
   const rtHeaderLabel = badgeLabel([rtHeaderDay, rtHeaderDistance])
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-[color:var(--m-bg)] bg-[image:var(--m-scr)] text-m-ink">
+    <div className="voya-mobile-trip fixed inset-0 z-50 overflow-hidden bg-[color:var(--m-bg)] bg-[image:var(--m-scr)] text-m-ink">
       {/* ── Content layers ─────────────────────────────────────────────── */}
       {/*
         One expression for both map tabs, and it has to stay one: written as two
@@ -470,7 +470,7 @@ export default function MTripShell({
 
       {/* ── Day chips (z-25 — covered by non-plan tab overlays, stays mounted) ── */}
       {days.length > 0 && (
-        <div className="absolute left-4 right-4 z-[25] flex gap-[6px] top-[calc(var(--m-safe-top,12px)+50px)]">
+        <div className="voya-day-rail absolute left-4 right-4 z-[25] flex gap-[6px] top-[calc(var(--m-safe-top,12px)+50px)]">
           <div className="flex flex-1 items-center gap-[2px] overflow-x-auto rounded-full border border-[color:var(--m-gbr)] bg-[color:var(--m-glass)] p-[3px] backdrop-blur-[24px] backdrop-saturate-[1.7]">
             {days.map((day, idx) => {
               const active = day.id === planner.selectedDayId
@@ -524,7 +524,7 @@ export default function MTripShell({
       )}
 
       {/* ── Top controls (z-42 — above every layer incl. tab overlays) ── */}
-      <div className="absolute left-4 right-4 z-[42] flex h-10 items-center justify-between top-[var(--m-safe-top,12px)]">
+      <div className="voya-trip-top-controls absolute left-4 right-4 z-[42] flex h-10 items-center justify-between top-[var(--m-safe-top,12px)]">
         <MIconBtn ariaLabel={t('common.back')} onClick={() => navigate('/dashboard')} className="backdrop-blur-[24px] backdrop-saturate-[1.7]">
           <ChevronLeft size={19} strokeWidth={2.2} />
         </MIconBtn>
