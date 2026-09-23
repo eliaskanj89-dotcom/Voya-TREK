@@ -13,6 +13,9 @@ interface MVoyaPlanComposerProps {
   dayCount: number
   currency: string
   autoExpand?: boolean
+  initialBudgetStyle?: VoyaPlanDraftRequest['budgetStyle']
+  initialInterests?: string
+  initialNotes?: string
   onCreated: (trip: Trip) => Promise<void> | void
 }
 
@@ -23,6 +26,9 @@ export default function MVoyaPlanComposer({
   dayCount,
   currency,
   autoExpand = false,
+  initialBudgetStyle,
+  initialInterests = '',
+  initialNotes = '',
   onCreated,
 }: MVoyaPlanComposerProps) {
   const dna = useSettingsStore(state => state.settings.voya_traveler_dna)
@@ -31,9 +37,9 @@ export default function MVoyaPlanComposer({
   const [destination, setDestination] = useState(initialDestination)
   const [multiDestinations, setMultiDestinations] = useState<string[]>([initialDestination, ''])
   const [pace, setPace] = useState<VoyaPlanDraftRequest['pace']>(dna?.pace ?? 'balanced')
-  const [budgetStyle, setBudgetStyle] = useState<VoyaPlanDraftRequest['budgetStyle']>(dna?.budgetStyle ?? 'moderate')
-  const [interests, setInterests] = useState('')
-  const [notes, setNotes] = useState('')
+  const [budgetStyle, setBudgetStyle] = useState<VoyaPlanDraftRequest['budgetStyle']>(initialBudgetStyle ?? dna?.budgetStyle ?? 'moderate')
+  const [interests, setInterests] = useState(initialInterests)
+  const [notes, setNotes] = useState(initialNotes)
   const [draft, setDraft] = useState<VoyaPlanDraftResponse | null>(null)
   const [multiDraft, setMultiDraft] = useState<VoyaMultiCityPlanDraft | null>(null)
   const [request, setRequest] = useState<VoyaPlanDraftRequest | null>(null)
@@ -51,8 +57,18 @@ export default function MVoyaPlanComposer({
   useEffect(() => {
     if (draft || multiDraft) return
     setPace(dna?.pace ?? 'balanced')
-    setBudgetStyle(dna?.budgetStyle ?? 'moderate')
-  }, [dna?.pace, dna?.budgetStyle, draft, multiDraft])
+    setBudgetStyle(initialBudgetStyle ?? dna?.budgetStyle ?? 'moderate')
+    setInterests(initialInterests)
+    setNotes(initialNotes)
+  }, [
+    dna?.pace,
+    dna?.budgetStyle,
+    initialBudgetStyle,
+    initialInterests,
+    initialNotes,
+    draft,
+    multiDraft,
+  ])
 
   const days = useMemo(
     () => startDate && endDate ? tripSpanDays(startDate, endDate) : Math.max(1, dayCount || 7),
