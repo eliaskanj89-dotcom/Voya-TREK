@@ -833,6 +833,7 @@ export class VoyaAiService {
     this.assertTripEditPlan(parsed.plan, this.days.list(tripId).days.map(day => day.id));
 
     this.assertAtomicTripEditBundle(parsed.plan, parsed.drafts);
+    const expectedDayIds = parsed.plan.affectedDays.map(item => item.dayId);
 
     const contexts = parsed.drafts.map(draft => {
       const day = this.days.getDay(draft.dayId, tripId);
