@@ -124,6 +124,7 @@ export class VoyaAiService {
         for (const activity of planDay.activities) {
           const suggestionNote = [
             'Suggested by Voya — verify current details before relying on them.',
+            `Voya destination: ${request.destination}.`,
             activity.notes,
             activity.reservationRecommended ? 'Reservation may be worth checking.' : '',
             activity.priceLabel,
