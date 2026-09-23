@@ -826,24 +826,7 @@ export class VoyaAiService {
 
     this.assertTripEditPlan(parsed.plan, this.days.list(tripId).days.map(day => day.id));
 
-    const expectedDayIds = parsed.plan.affectedDays.map(item => item.dayId);
-    const draftDayIds = parsed.drafts.map(draft => draft.dayId);
-    const uniqueDraftDayIds = new Set(draftDayIds);
-
-    if (uniqueDraftDayIds.size !== draftDayIds.length) {
-      throw new VoyaAiInvalidDraftError('Whole-trip edit contains duplicate day drafts');
-    }
-    if (
-      expectedDayIds.length !== draftDayIds.length ||
-      expectedDayIds.some(dayId => !uniqueDraftDayIds.has(dayId))
-    ) {
-      throw new VoyaAiInvalidDraftError('Every affected day must have exactly one reviewed draft before applying');
-    }
-    for (const draft of parsed.drafts) {
-      if (draft.tripId !== tripId) {
-        throw new VoyaAiInvalidDraftError('All reviewed day drafts must belong to the same trip');
-      }
-    }
+    this.assertAtomicTripEditBundle(parsed.plan, parsed.drafts);
 
     const contexts = parsed.drafts.map(draft => {
       const day = this.days.getDay(draft.dayId, tripId);
@@ -873,6 +856,30 @@ export class VoyaAiService {
       affectedDays: contexts.map(({ draft }) => draft.dayId),
       appliedDays: contexts.length,
     };
+  }
+
+  private assertAtomicTripEditBundle(
+    plan: VoyaTripEditPlan,
+    drafts: VoyaDayEditDraft[],
+  ): void {
+    const expectedDayIds = plan.affectedDays.map(item => item.dayId);
+    const draftDayIds = drafts.map(draft => draft.dayId);
+    const uniqueDraftDayIds = new Set(draftDayIds);
+
+    if (uniqueDraftDayIds.size !== draftDayIds.length) {
+      throw new VoyaAiInvalidDraftError('Whole-trip edit contains duplicate day drafts');
+    }
+    if (
+      expectedDayIds.length !== draftDayIds.length ||
+      expectedDayIds.some(dayId => !uniqueDraftDayIds.has(dayId))
+    ) {
+      throw new VoyaAiInvalidDraftError('Every affected day must have exactly one reviewed draft before applying');
+    }
+    for (const draft of drafts) {
+      if (draft.tripId !== plan.tripId) {
+        throw new VoyaAiInvalidDraftError('All reviewed day drafts must belong to the same trip');
+      }
+    }
   }
 
   private applyDayEditMutation(
