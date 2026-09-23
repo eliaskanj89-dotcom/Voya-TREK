@@ -29,6 +29,7 @@ export function useDashboard() {
   const [archivedTrips, setArchivedTrips] = useState<DashboardTrip[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [showForm, setShowForm] = useState<boolean>(false)
+  const [createSeed, setCreateSeed] = useState<{ destination: string; days: number } | null>(null)
   const [editingTrip, setEditingTrip] = useState<DashboardTrip | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('trek_dashboard_view') as 'grid' | 'list') || 'grid')
   const [deleteTrip, setDeleteTrip] = useState<DashboardTrip | null>(null)
@@ -57,6 +58,15 @@ export function useDashboard() {
 
   useEffect(() => {
     if (searchParams.get('create') === '1') {
+      const destination = (searchParams.get('destination') || '').trim()
+      const requestedDays = Number(searchParams.get('days'))
+      setCreateSeed(destination
+        ? {
+            destination,
+            days: Number.isInteger(requestedDays) && requestedDays >= 1 && requestedDays <= 30 ? requestedDays : 7,
+          }
+        : null)
+      setEditingTrip(null)
       setShowForm(true)
       setSearchParams({}, { replace: true })
     }
@@ -205,7 +215,7 @@ export function useDashboard() {
     loadError: loadError || authCheckFailed, retryLoad,
     // ui state
     tripFilter, setTripFilter, viewMode, toggleViewMode,
-    showForm, setShowForm, editingTrip, setEditingTrip,
+    showForm, setShowForm, createSeed, setCreateSeed, editingTrip, setEditingTrip,
     deleteTrip, setDeleteTrip, copyTrip, setCopyTrip, applyCoverUpdate,
     allSubOpen, setAllSubOpen,
     // actions
