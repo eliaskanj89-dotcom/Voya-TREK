@@ -3,7 +3,7 @@ import type { User } from '../../types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StructuredGenerationError } from './structured-generation.service';
-import { VoyaApplyDayEditDto, VoyaDayEditDto, VoyaMaterializeDraftDto, VoyaPlanDraftDto, VoyaTripEditDto, VoyaVerifyTripDto } from './voya-ai.dto';
+import { VoyaApplyDayEditDto, VoyaDayEditDto, VoyaMaterializeDraftDto, VoyaPlanDraftDto, VoyaTripEditDto, VoyaVerifyTripDto, VoyaReadinessBuildDto, VoyaReadinessStatusDto } from './voya-ai.dto';
 import {
   VoyaAiInvalidDraftError,
   VoyaAiPermissionError,
@@ -15,6 +15,52 @@ import {
 @UseGuards(JwtAuthGuard)
 export class VoyaAiController {
   constructor(private readonly voya: VoyaAiService) {}
+
+  @Post('readiness')
+  readiness(@CurrentUser() user: User, @Body() body: VoyaReadinessBuildDto) {
+    try {
+      return this.voya.getReadiness(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      throw new HttpException({ error: 'Voya could not load trip readiness', code: 'VOYA_READINESS_ERROR' }, 500);
+    }
+  }
+
+  @Post('readiness-refresh')
+  async refreshReadiness(@CurrentUser() user: User, @Body() body: VoyaReadinessBuildDto) {
+    try {
+      return await this.voya.refreshReadiness(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiUnavailableError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_NOT_CONFIGURED' }, 409);
+      }
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      if (error instanceof VoyaAiInvalidDraftError || error instanceof StructuredGenerationError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_READINESS_GENERATION_ERROR' }, 502);
+      }
+      console.error('Voya readiness refresh failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not refresh trip readiness', code: 'VOYA_READINESS_ERROR' }, 500);
+    }
+  }
+
+  @Post('readiness-status')
+  readinessStatus(@CurrentUser() user: User, @Body() body: VoyaReadinessStatusDto) {
+    try {
+      return this.voya.updateReadinessStatus(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_READINESS_ITEM_NOT_FOUND' }, 404);
+      }
+      throw new HttpException({ error: 'Voya could not update readiness', code: 'VOYA_READINESS_ERROR' }, 500);
+    }
+  }
 
   @Post('materialize-draft')
   materializeDraft(@CurrentUser() user: User, @Body() body: VoyaMaterializeDraftDto) {
