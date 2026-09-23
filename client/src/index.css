@@ -1925,3 +1925,24 @@ button, a, [role="button"] {
   background: rgba(255,255,255,.055) !important;
   border-color: rgba(255,255,255,.08) !important;
 }
+
+
+/* Voya branded empty-state object — replaces the upstream mascot visually while
+   keeping existing scene/mood component contracts intact. */
+.voya-empty-orb {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255,255,255,.48), transparent 24%),
+    linear-gradient(145deg, #79AEFF 0%, #377CF6 54%, #245FD3 100%);
+  box-shadow: 0 18px 44px rgba(55,124,246,.24), inset 0 1px 0 rgba(255,255,255,.38);
+}
+.voya-empty-orb::before,
+.voya-empty-orb::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.32);
+}
+.voya-empty-orb::before { width: 72%; height: 72%; }
+.voya-empty-orb::after { width: 45%; height: 45%; }
