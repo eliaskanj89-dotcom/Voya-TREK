@@ -36,6 +36,7 @@ export default function MVoyaReadinessSheet({ planner, shell }: MTripSheetsProps
     setError('')
     try {
       setData(await voyaAiApi.refreshReadiness({ tripId: planner.tripId }))
+      window.dispatchEvent(new CustomEvent('voya:readiness-updated', { detail: { tripId: planner.tripId } }))
     } catch {
       setError('Voya could not refresh this checklist.')
     } finally {
@@ -53,6 +54,7 @@ export default function MVoyaReadinessSheet({ planner, shell }: MTripSheetsProps
         itemId: item.id,
         status,
       }))
+      window.dispatchEvent(new CustomEvent('voya:readiness-updated', { detail: { tripId: planner.tripId } }))
     } catch {
       setError('Voya could not update this item.')
     } finally {
