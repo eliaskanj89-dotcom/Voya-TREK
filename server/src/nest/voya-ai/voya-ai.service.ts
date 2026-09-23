@@ -674,7 +674,7 @@ export class VoyaAiService {
         );
 
       if (routed.length >= 4) {
-        const optimized = optimizeRoute(routed);
+        const optimized = optimizeRoute(routed) as typeof routed;
         const currentLength = healthRouteLength(routed);
         const optimizedLength = healthRouteLength(optimized);
         const improvement = currentLength > 0 ? (currentLength - optimizedLength) / currentLength : 0;
