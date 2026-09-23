@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ArrowDown, ArrowRight, ArrowUp, Check, MapPin, Plus, Sparkles, Trash2 } from 'lucide-react'
-import type { Trip, VoyaMultiCityPlanDraft, VoyaMultiCityPlanRequest, VoyaPlanDraftRequest, VoyaPlanDraftResponse } from '@trek/shared'
+import type { Trip, VoyaMultiCityPlanDraft, VoyaMultiCityPlanRequest, VoyaPlanDraftRequest, VoyaPlanDraftResponse, VoyaResolvedDestination } from '@trek/shared'
 import { tripSpanDays } from '@trek/shared'
 import { voyaAiApi } from '../../api/client'
 import { startVoyaEnrichment } from '../../services/voyaEnrichment'
@@ -56,6 +56,8 @@ export default function VoyaPlanComposer({
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [needsAiSetup, setNeedsAiSetup] = useState(false)
+  const [destinationMatches, setDestinationMatches] = useState<VoyaResolvedDestination[]>([])
+  const [resolvingDestination, setResolvingDestination] = useState(false)
 
   useEffect(() => {
     if (initialDestination.trim()) {
@@ -162,6 +164,31 @@ export default function VoyaPlanComposer({
       ;[next[index], next[target]] = [next[target], next[index]]
       return next
     })
+  }
+
+  const resolveDestination = async () => {
+    const query = destination.trim()
+    if (query.length < 2) {
+      setDestinationMatches([])
+      return
+    }
+    setResolvingDestination(true)
+    setError('')
+    setNeedsAiSetup(false)
+    try {
+      const result = await voyaAiApi.resolveDestination({ query })
+      setDestinationMatches(result.suggestions)
+    } catch (err: unknown) {
+      setNeedsAiSetup(isVoyaAiNotConfigured(err))
+      setError(getApiErrorMessage(err, 'Voya could not find destination matches right now.'))
+    } finally {
+      setResolvingDestination(false)
+    }
+  }
+
+  const chooseDestinationMatch = (match: VoyaResolvedDestination) => {
+    setDestination(match.searchTerm)
+    setDestinationMatches([])
   }
 
   const generate = async () => {
@@ -302,11 +329,47 @@ export default function VoyaPlanComposer({
                 <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#377CF6]" />
                 <input
                   value={destination}
-                  onChange={event => setDestination(event.target.value)}
+                  onChange={event => {
+                    setDestination(event.target.value)
+                    setDestinationMatches([])
+                  }}
                   placeholder="Tokyo, Japan"
                   className="w-full rounded-2xl border border-edge bg-white/75 py-3 pl-10 pr-4 text-body text-content outline-none placeholder:text-content-faint focus:border-[#377CF6] focus:ring-4 focus:ring-[#377CF6]/10 dark:bg-white/5"
                 />
               </div>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <p className="text-[11px] leading-relaxed text-content-faint">
+                  Ambiguous place? Voya can suggest the most likely real destinations before planning.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { void resolveDestination() }}
+                  disabled={resolvingDestination || destination.trim().length < 2}
+                  className="inline-flex flex-none items-center gap-1.5 rounded-full border border-[#377CF6]/20 px-3 py-1.5 text-[11px] font-semibold text-[#377CF6] transition-all hover:bg-[#377CF6]/6 disabled:opacity-40"
+                >
+                  <MapPin size={11} />
+                  {resolvingDestination ? 'Finding…' : 'Find matches'}
+                </button>
+              </div>
+              {destinationMatches.length > 0 && (
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {destinationMatches.map(match => (
+                    <button
+                      type="button"
+                      key={`${match.name}|${match.country}|${match.region || ''}`}
+                      onClick={() => chooseDestinationMatch(match)}
+                      className="rounded-[16px] border border-edge-faint bg-surface-card px-3.5 py-3 text-left transition-all hover:border-[#377CF6]/25 hover:bg-[#377CF6]/5"
+                    >
+                      <div className="text-caption font-semibold text-content">{match.name}</div>
+                      <div className="mt-0.5 text-[10px] uppercase tracking-[.08em] text-content-faint">
+                        {[match.region, match.country].filter(Boolean).join(' · ')}
+                      </div>
+                      <p className="mt-1.5 text-[11px] leading-relaxed text-content-muted">{match.subtitle}</p>
+                      {match.disambiguation && <p className="mt-1 text-[10px] text-[#377CF6]">{match.disambiguation}</p>}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div>
