@@ -247,66 +247,95 @@ function JourneyStopCard({
     [segment.destination, segment.country].filter(Boolean).join(', '),
   )
 
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`group relative min-w-[132px] overflow-hidden rounded-[16px] border text-left transition-all ${
-        active
-          ? 'border-[#377CF6]/30 shadow-[0_9px_22px_rgba(55,124,246,.22)]'
-          : 'border-edge-faint hover:-translate-y-px hover:border-[#377CF6]/20'
-      }`}
-    >
-      {visual ? (
-        <>
-          <img
-            src={visual.url}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-          />
-          <div className={`absolute inset-0 ${
-            active
-              ? 'bg-[linear-gradient(180deg,rgba(18,64,132,.22),rgba(24,84,187,.80))]'
-              : 'bg-[linear-gradient(180deg,rgba(4,17,33,.18),rgba(4,17,33,.76))]'
-          }`} />
-        </>
-      ) : (
-        <>
-          <div className={`absolute inset-0 ${
-            active
-              ? 'bg-[linear-gradient(145deg,#4D8DF9,#286CE4)]'
-              : 'bg-[linear-gradient(145deg,rgba(243,249,255,.96),rgba(230,241,255,.88))] dark:bg-[linear-gradient(145deg,rgba(18,38,64,.94),rgba(9,24,42,.90))]'
-          }`} />
-          {loading && !active && (
-            <div className="absolute inset-0 animate-pulse bg-[linear-gradient(100deg,transparent_15%,rgba(255,255,255,.45)_44%,transparent_72%)] bg-[length:220%_100%]" />
-          )}
-        </>
-      )}
+  const credit = visual
+    ? visual.source === 'google'
+      ? 'Google'
+      : [
+          visual.source === 'wikimedia'
+            ? 'Wikimedia'
+            : visual.source === 'wikipedia'
+              ? 'Wikipedia'
+              : 'Cached',
+          visual.attribution,
+        ].filter(Boolean).join(' · ')
+    : ''
 
-      <div className="relative z-10 px-3 py-2.5">
-        <div className={`text-[8px] font-semibold uppercase tracking-[.1em] ${
-          visual || active ? 'text-white/58' : 'text-content-faint'
-        }`}>
-          Stop {index + 1}
+  return (
+    <div className="relative min-w-[132px]">
+      <button
+        type="button"
+        onClick={onSelect}
+        className={`group relative w-full overflow-hidden rounded-[16px] border text-left transition-all ${
+          active
+            ? 'border-[#377CF6]/30 shadow-[0_9px_22px_rgba(55,124,246,.22)]'
+            : 'border-edge-faint hover:-translate-y-px hover:border-[#377CF6]/20'
+        }`}
+      >
+        {visual ? (
+          <>
+            <img
+              src={visual.url}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            />
+            <div className={`absolute inset-0 ${
+              active
+                ? 'bg-[linear-gradient(180deg,rgba(18,64,132,.22),rgba(24,84,187,.80))]'
+                : 'bg-[linear-gradient(180deg,rgba(4,17,33,.18),rgba(4,17,33,.76))]'
+            }`} />
+          </>
+        ) : (
+          <>
+            <div className={`absolute inset-0 ${
+              active
+                ? 'bg-[linear-gradient(145deg,#4D8DF9,#286CE4)]'
+                : 'bg-[linear-gradient(145deg,rgba(243,249,255,.96),rgba(230,241,255,.88))] dark:bg-[linear-gradient(145deg,rgba(18,38,64,.94),rgba(9,24,42,.90))]'
+            }`} />
+            {loading && !active && (
+              <div className="absolute inset-0 animate-pulse bg-[linear-gradient(100deg,transparent_15%,rgba(255,255,255,.45)_44%,transparent_72%)] bg-[length:220%_100%]" />
+            )}
+          </>
+        )}
+
+        <div className="relative z-10 px-3 py-2.5">
+          <div className={`text-[8px] font-semibold uppercase tracking-[.1em] ${
+            visual || active ? 'text-white/58' : 'text-content-faint'
+          }`}>
+            Stop {index + 1}
+          </div>
+          <div className={`mt-0.5 max-w-[118px] truncate text-[11px] font-semibold ${
+            visual || active ? 'text-white' : 'text-content'
+          }`}>
+            {segment.destination}
+          </div>
+          <div className={`mt-0.5 text-[9px] ${
+            visual || active ? 'text-white/68' : 'text-content-faint'
+          }`}>
+            {segment.dayCount} day{segment.dayCount === 1 ? '' : 's'}
+          </div>
         </div>
-        <div className={`mt-0.5 max-w-[118px] truncate text-[11px] font-semibold ${
-          visual || active ? 'text-white' : 'text-content'
-        }`}>
-          {segment.destination}
-        </div>
-        <div className={`mt-0.5 text-[9px] ${
-          visual || active ? 'text-white/68' : 'text-content-faint'
-        }`}>
-          {segment.dayCount} day{segment.dayCount === 1 ? '' : 's'}
-        </div>
-      </div>
+      </button>
 
       {visual && (
-        <div
-          className="absolute bottom-1.5 right-1.5 z-20 h-1.5 w-1.5 rounded-full bg-white/65 shadow-[0_0_0_2px_rgba(0,0,0,.16)]"
-          title={visual.source === 'google' ? 'Google photo' : `${visual.source} photo`}
-        />
+        visual.sourceUrl || visual.licenseUrl ? (
+          <a
+            href={visual.sourceUrl || visual.licenseUrl || undefined}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 block max-w-[132px] truncate px-1 text-[7px] font-medium text-content-faint hover:text-[#377CF6]"
+            title={[credit, visual.license].filter(Boolean).join(' · ')}
+          >
+            Photo · {credit}{visual.license ? ` · ${visual.license}` : ''}
+          </a>
+        ) : (
+          <div
+            className="mt-1 max-w-[132px] truncate px-1 text-[7px] font-medium text-content-faint"
+            title={[credit, visual.license].filter(Boolean).join(' · ')}
+          >
+            Photo · {credit}{visual.license ? ` · ${visual.license}` : ''}
+          </div>
+        )
       )}
-    </button>
+    </div>
   )
 }
