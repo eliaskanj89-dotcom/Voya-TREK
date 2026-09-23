@@ -379,6 +379,26 @@ export default function MTripShell({
   const openSheet = (id: string, payload?: unknown) => setSheet({ id, payload })
   const closeSheet = () => setSheet(null)
 
+  useEffect(() => {
+    const onOpenReadiness = (event: Event) => {
+      const detail = (event as CustomEvent<{ tripId?: number }>).detail
+      if (detail?.tripId !== tripId) return
+      openSheet('readiness')
+    }
+    const onOpenReservations = (event: Event) => {
+      const detail = (event as CustomEvent<{ tripId?: number }>).detail
+      if (detail?.tripId !== tripId) return
+      setTrTab('buchungen')
+      closeSheet()
+    }
+    window.addEventListener('voya:open-readiness', onOpenReadiness)
+    window.addEventListener('voya:open-reservations', onOpenReservations)
+    return () => {
+      window.removeEventListener('voya:open-readiness', onOpenReadiness)
+      window.removeEventListener('voya:open-reservations', onOpenReservations)
+    }
+  }, [tripId, setTrTab])
+
   const shell: MTripShellApi = {
     view, rtView, mapFront, toggleRtView, rtReach, setRtReach, mode, trTab, setTrTab, setTravelMode, toggleView, browseFromEdit,
     sheet, openSheet, closeSheet,
