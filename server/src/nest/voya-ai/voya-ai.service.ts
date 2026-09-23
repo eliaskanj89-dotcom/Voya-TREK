@@ -28,6 +28,8 @@ import {
   type VoyaReadinessBuildRequest,
   type VoyaReadinessResult,
   type VoyaReadinessStatusRequest,
+  type VoyaReadinessToTodoRequest,
+  type VoyaReadinessToTodoResult,
   voyaGeneratedReadinessItemSchema,
   voyaDestinationDiscoveryResultSchema,
   voyaMultiCityPlanDraftSchema,
@@ -51,6 +53,7 @@ import { MapsService } from '../maps/maps.service';
 import { SettingsService } from '../settings/settings.service';
 import { TransitService } from '../transit/transit.service';
 import { RoadtripRouterService } from '../roadtrip/roadtrip-router.service';
+import { TodoService } from '../todo/todo.service';
 
 const generatedPlanSchema = voyaPlanDraftResponseSchema.omit({ generatedBy: true });
 const generatedMultiCityPlanSchema = voyaMultiCityPlanDraftSchema.omit({ generatedBy: true });
@@ -579,6 +582,46 @@ export class VoyaAiService {
     });
 
     return this.getReadiness(user, request);
+  }
+
+  readinessToTodo(user: User, request: VoyaReadinessToTodoRequest): VoyaReadinessToTodoResult {
+    this.assertTripAccess(request.tripId, user.id);
+    const trip = this.todo.verifyTripAccess(request.tripId, user.id);
+    if (!trip) throw new VoyaAiPermissionError('Trip not found');
+    if (!this.todo.canEdit(trip, user)) throw new VoyaAiPermissionError('No permission to edit trip tasks');
+
+    const item = this.db.get<VoyaReadinessRow>(
+      'SELECT * FROM voya_readiness_items WHERE id = ? AND trip_id = ?',
+      request.itemId,
+      request.tripId,
+    );
+    if (!item) throw new VoyaAiInvalidDraftError('Readiness item not found');
+
+    const marker = `[voya-readiness:${item.id}]`;
+    const existing = this.todo.listItems(request.tripId).find((todoItem: any) =>
+      typeof todoItem.description === 'string' && todoItem.description.includes(marker),
+    );
+    if (existing) {
+      return { created: false, todoItemId: Number((existing as any).id) };
+    }
+
+    const priority = item.priority === 'High' ? 1 : item.priority === 'Medium' ? 2 : 3;
+    const description = [
+      item.reason,
+      item.action_label ? `Suggested action: ${item.action_label}` : '',
+      'Created from Voya Before You Go.',
+      marker,
+    ].filter(Boolean).join('\n\n');
+
+    const created = this.todo.createItem(request.tripId, {
+      name: item.title,
+      category: 'Voya · Before You Go',
+      description,
+      priority,
+    }) as any;
+
+    this.todo.broadcast(String(request.tripId), 'todo:created', { item: created }, undefined);
+    return { created: true, todoItemId: Number(created.id) };
   }
 
   updateReadinessStatus(user: User, request: VoyaReadinessStatusRequest): VoyaReadinessResult {
