@@ -12,7 +12,7 @@ import { CustomDatePicker } from '../../../components/shared/CustomDateTimePicke
 import CustomSelect from '../../../components/shared/CustomSelect'
 import { currenciesWith, SYMBOLS } from '../../../components/Budget/BudgetPanel.constants'
 import type { DashboardTrip } from '../../../pages/dashboard/dashboardModel'
-import { MAX_TRIP_DAYS, tripSpanDays, type Trip, type TripCreateRequest } from '@trek/shared'
+import { MAX_TRIP_DAYS, tripSpanDays, type Trip, type TripCreateRequest, type VoyaPlanDraftRequest } from '@trek/shared'
 import MSheet from '../../components/MSheet'
 import MIconBtn from '../../components/MIconBtn'
 import MListRow from '../../components/MListRow'
@@ -32,6 +32,11 @@ interface MNewTripSheetProps {
   trip: DashboardTrip | null
   initialDestination?: string
   initialDayCount?: number
+  initialVoyaSeed?: {
+    budgetStyle?: VoyaPlanDraftRequest['budgetStyle']
+    interests?: string
+    notes?: string
+  }
   onClose: () => void
   onSave: (data: TripCreateRequest) => Promise<{ trip?: Trip } | void> | void
   onCoverUpdate?: (tripId: number, coverUrl: string | null) => void
@@ -50,7 +55,7 @@ function FieldLabel({ children }: { children: React.ReactNode }): React.ReactEle
  * title, date range and Unsplash cover search (plus device upload). Archiving
  * lives here in edit mode, as decided for the grid cards.
  */
-export default function MNewTripSheet({ open, trip, initialDestination, initialDayCount, onClose, onSave, onCoverUpdate, onArchive }: MNewTripSheetProps): React.ReactElement {
+export default function MNewTripSheet({ open, trip, initialDestination, initialDayCount, initialVoyaSeed, onClose, onSave, onCoverUpdate, onArchive }: MNewTripSheetProps): React.ReactElement {
   const isEditing = !!trip
   const navigate = useNavigate()
   const { t } = useTranslation()
