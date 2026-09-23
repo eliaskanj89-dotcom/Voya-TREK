@@ -1,8 +1,8 @@
-import { useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import {
   ArrowRight, BedDouble, CalendarDays, CalendarRange, ChevronRight, Compass, LogIn, LogOut,
   MapPin, Pencil, PencilLine, Route, Ticket, TrainFront, Undo2,
-  Car, Footprints, Zap, RotateCcw, TramFront, Sparkles,
+  Car, Clock3, Footprints, Zap, RotateCcw, TramFront, Sparkles,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useContextMenu, ContextMenu } from '../../../../components/shared/ContextMenu'
@@ -27,6 +27,7 @@ import type { ComponentType, ReactNode } from 'react'
 import GoogleMapsIcon from '../../../../components/shared/GoogleMapsIcon'
 import VoyaDayEditModal from '../../../../components/Planner/VoyaDayEditModal'
 import VoyaTripEditModal from '../../../../components/Planner/VoyaTripEditModal'
+import VoyaEditHistoryModal from '../../../../components/Planner/VoyaEditHistoryModal'
 import VoyaLiveTripCard from '../../../../components/Planner/VoyaLiveTripCard'
 import VoyaJourneyStrip from '../../../../components/Planner/VoyaJourneyStrip'
 import { findTodayDayId } from '../../../../components/Planner/today'
@@ -49,6 +50,7 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
   const [voyaEditOpen, setVoyaEditOpen] = useState(false)
   const [voyaEditSeed, setVoyaEditSeed] = useState('')
   const [voyaTripEditOpen, setVoyaTripEditOpen] = useState(false)
+  const [voyaHistoryOpen, setVoyaHistoryOpen] = useState(false)
   const [pendingHealthRouteDayId, setPendingHealthRouteDayId] = useState<number | null>(null)
   useEffect(() => {
     const onHealthRepair = (event: Event) => {
@@ -369,6 +371,7 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
             <PlanAction icon={Compass} label={t('mobileTrip.coMaps')} onClick={tl.exportCoMaps} />
             <PlanAction icon={Sparkles} label="Ask Voya · Day" onClick={() => { setVoyaEditSeed(''); setVoyaEditOpen(true) }} />
             <PlanAction icon={Sparkles} label="Ask Voya · Trip" onClick={() => setVoyaTripEditOpen(true)} />
+            <PlanAction icon={Clock3} label="Voya History" onClick={() => setVoyaHistoryOpen(true)} />
           </div>
         )}
       </div>
@@ -383,6 +386,18 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
         onDayApplied={async () => {
           await useTripStore.getState().loadTrip(planner.tripId)
           planner.autoShowRoute()
+        }}
+      />
+
+      <VoyaEditHistoryModal
+        isOpen={voyaHistoryOpen}
+        onClose={() => setVoyaHistoryOpen(false)}
+        tripId={planner.tripId}
+        days={planner.days}
+        onRestored={async () => {
+          await useTripStore.getState().loadTrip(planner.tripId)
+          planner.autoShowRoute()
+          planner.toast.success('Voya restored that itinerary version.')
         }}
       />
 
