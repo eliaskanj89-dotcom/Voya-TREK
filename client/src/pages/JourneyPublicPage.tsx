@@ -662,7 +662,7 @@ export default function JourneyPublicPage() {
             position: 'relative',
           }}
         >
-          <img src="/icons/icon-white.svg" alt="TREK" width={26} height={26} />
+          <span className="voya-wordmark" aria-label="Voya" style={{ color: 'white', fontSize: 24 }}>V</span>
         </div>
 
         <div
@@ -890,9 +890,9 @@ export default function JourneyPublicPage() {
             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
           }}
         >
-          <img src="/icons/icon.svg" alt="TREK" width={18} height={18} style={{ borderRadius: 4 }} />
+          <span className="voya-wordmark" aria-hidden style={{ color: '#377CF6', fontSize: 17 }}>V</span>
           <span style={{ fontSize: 'calc(11px * var(--fs-scale-caption, 1))', color: '#9ca3af' }}>
-            {t('journey.public.sharedVia')} <strong style={{ color: '#6b7280' }}>TREK</strong>
+            {t('journey.public.sharedVia')} <strong style={{ color: '#6b7280' }}>Voya</strong>
           </span>
         </div>
         <div style={{ fontSize: 'calc(10px * var(--fs-scale-caption, 1))', color: '#d1d5db' }}>
