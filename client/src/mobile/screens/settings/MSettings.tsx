@@ -12,6 +12,7 @@ import {
   Puzzle,
   Settings2,
   SlidersHorizontal,
+  Sparkles,
   User,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -23,6 +24,7 @@ import MSettingsPlugins from './MSettingsPlugins'
 import MSettingsOffline from './MSettingsOffline'
 import MSettingsGeneral from './MSettingsGeneral'
 import MSettingsAppearance from './MSettingsAppearance'
+import MSettingsTravelerDna from './MSettingsTravelerDna'
 import MSettingsMap from './MSettingsMap'
 import MSettingsNotifications from './MSettingsNotifications'
 import MSettingsIntegrations from './MSettingsIntegrations'
@@ -52,6 +54,7 @@ export default function MSettings() {
   const tabs: SectionTab[] = [
     { id: 'display', label: t('settings.tabs.display'), icon: SlidersHorizontal },
     { id: 'appearance', label: t('settings.tabs.appearance'), icon: Palette },
+    { id: 'traveler', label: 'Traveler DNA', icon: Sparkles },
     { id: 'map', label: t('settings.tabs.map'), icon: Map },
     { id: 'notifications', label: t('settings.tabs.notifications'), icon: Bell },
     ...(hasIntegrations ? [{ id: 'integrations', label: t('settings.tabs.integrations'), icon: Plug }] : []),
@@ -116,6 +119,7 @@ export default function MSettings() {
 
       {active.id === 'display' && <MSettingsGeneral />}
       {active.id === 'appearance' && <MSettingsAppearance />}
+      {active.id === 'traveler' && <MSettingsTravelerDna />}
       {active.id === 'map' && <MSettingsMap />}
       {active.id === 'notifications' && <MSettingsNotifications />}
       {active.id === 'integrations' && hasIntegrations && <MSettingsIntegrations />}
