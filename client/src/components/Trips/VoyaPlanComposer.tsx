@@ -3,6 +3,7 @@ import { ArrowDown, ArrowRight, ArrowUp, Check, MapPin, Plus, Sparkles, Trash2 }
 import type { Trip, VoyaMultiCityPlanDraft, VoyaMultiCityPlanRequest, VoyaPlanDraftRequest, VoyaPlanDraftResponse } from '@trek/shared'
 import { tripSpanDays } from '@trek/shared'
 import { voyaAiApi } from '../../api/client'
+import { startVoyaEnrichment } from '../../services/voyaEnrichment'
 import { getApiErrorMessage } from '../../types'
 import { useSettingsStore } from '../../store/settingsStore'
 
