@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, CheckCircle2, Circle, RefreshCw, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { Check, CheckCircle2, Circle, ListTodo, RefreshCw, ShieldCheck, Sparkles, X } from 'lucide-react'
 import type { VoyaReadinessItem, VoyaReadinessResult, VoyaReadinessStatus } from '@trek/shared'
 import Modal from '../shared/Modal'
 import { voyaAiApi } from '../../api/client'
@@ -15,6 +15,8 @@ export default function VoyaReadinessPanel({ tripId }: VoyaReadinessPanelProps) 
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [updatingId, setUpdatingId] = useState<number | null>(null)
+  const [taskingId, setTaskingId] = useState<number | null>(null)
+  const [taskItemIds, setTaskItemIds] = useState<Set<number>>(() => new Set())
   const [error, setError] = useState('')
 
   const load = async () => {
@@ -63,6 +65,20 @@ export default function VoyaReadinessPanel({ tripId }: VoyaReadinessPanelProps) 
       setError(getApiErrorMessage(err, 'Voya could not update this checklist item.'))
     } finally {
       setUpdatingId(null)
+    }
+  }
+
+  const addToTasks = async (item: VoyaReadinessItem) => {
+    if (taskingId != null) return
+    setTaskingId(item.id)
+    setError('')
+    try {
+      await voyaAiApi.readinessToTodo({ tripId, itemId: item.id })
+      setTaskItemIds(prev => new Set(prev).add(item.id))
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Voya could not add this item to trip tasks.'))
+    } finally {
+      setTaskingId(null)
     }
   }
 
@@ -199,6 +215,9 @@ export default function VoyaReadinessPanel({ tripId }: VoyaReadinessPanelProps) 
                     item={item}
                     busy={updatingId === item.id}
                     onStatus={status => { void setStatus(item, status) }}
+                    taskBusy={taskingId === item.id}
+                    taskAdded={taskItemIds.has(item.id)}
+                    onAddTask={() => { void addToTasks(item) }}
                   />
                 ))}
               </div>
@@ -220,10 +239,16 @@ function ReadinessRow({
   item,
   busy,
   onStatus,
+  taskBusy,
+  taskAdded,
+  onAddTask,
 }: {
   item: VoyaReadinessItem
   busy: boolean
   onStatus: (status: VoyaReadinessStatus) => void
+  taskBusy: boolean
+  taskAdded: boolean
+  onAddTask: () => void
 }) {
   const resolved = item.status !== 'To do'
   const priorityClass =
@@ -260,6 +285,17 @@ function ReadinessRow({
           </div>
           <p className="mt-1 text-caption leading-relaxed text-content-muted">{item.reason}</p>
           {item.actionLabel && <p className="mt-1 text-[10px] font-medium text-content-faint">{item.actionLabel}</p>}
+          {item.status === 'To do' && (
+            <button
+              type="button"
+              disabled={taskBusy || taskAdded}
+              onClick={onAddTask}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#377CF6]/15 bg-[#377CF6]/6 px-2.5 py-1 text-[10px] font-semibold text-[#377CF6] hover:bg-[#377CF6]/10 disabled:opacity-60"
+            >
+              {taskBusy ? <RefreshCw size={10} className="animate-spin" /> : taskAdded ? <Check size={10} /> : <ListTodo size={10} />}
+              {taskBusy ? 'Adding…' : taskAdded ? 'Added to Tasks' : 'Add to Tasks'}
+            </button>
+          )}
         </div>
 
         <button
