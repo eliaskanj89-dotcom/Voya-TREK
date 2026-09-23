@@ -1,9 +1,27 @@
 import { Body, Controller, HttpException, Post, UseGuards } from '@nestjs/common';
 import type { User } from '../../types';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import {
+  JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StructuredGenerationError } from './structured-generation.service';
-import { VoyaApplyDayEditDto, VoyaApplyTripEditDto, VoyaDayEditDto, VoyaEditHistoryDto, VoyaMaterializeDraftDto, VoyaMaterializeMultiCityDraftDto, VoyaMultiCityPlanDto, VoyaPlanDraftDto, VoyaRestoreEditSnapshotDto, VoyaTripEditDto, VoyaVerifyTripDto, VoyaReadinessBuildDto, VoyaReadinessStatusDto, VoyaReadinessToTodoDto, VoyaDestinationDiscoveryDto } from './voya-ai.dto';
+import { VoyaApplyDayEditDto,
+  VoyaApplyTripEditDto,
+  VoyaDayEditDto,
+  VoyaEditHistoryDto,
+  VoyaMaterializeDraftDto,
+  VoyaMaterializeMultiCityDraftDto,
+  VoyaMultiCityPlanDto,
+  VoyaPlanDraftDto,
+  VoyaRestoreEditSnapshotDto,
+  VoyaTripEditDto,
+  VoyaVerifyTripDto,
+  VoyaReadinessBuildDto,
+  VoyaReadinessStatusDto,
+  VoyaReadinessToTodoDto,
+  VoyaDestinationDiscoveryDto,
+  VoyaTransportAdviceDto,
+  VoyaTripHealthDto
+} from './voya-ai.dto';
 import {
   VoyaAiInvalidDraftError,
   VoyaAiPermissionError,
