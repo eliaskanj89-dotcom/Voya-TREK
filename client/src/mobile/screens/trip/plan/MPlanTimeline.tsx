@@ -2,7 +2,7 @@ import { useRef, useState, type MouseEvent } from 'react'
 import {
   ArrowRight, BedDouble, CalendarDays, CalendarRange, ChevronRight, Compass, LogIn, LogOut,
   MapPin, Pencil, PencilLine, Route, Ticket, TrainFront, Undo2,
-  Car, Footprints, Zap, RotateCcw, TramFront,
+  Car, Footprints, Zap, RotateCcw, TramFront, Sparkles,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useContextMenu, ContextMenu } from '../../../../components/shared/ContextMenu'
@@ -19,13 +19,14 @@ import { ConnRow, HotelConnRow, NoteRow, PlaceRow, PlanScheduleRow, ReorderStack
 import type { RowDrag } from './MPlanTimelineRows'
 import { usePluginDaySchedule } from '../../../../components/Plugins/PluginDaySchedule'
 import { Fragment } from 'react'
-import MDancingTrek from '../../../components/MDancingTrek'
 import type { MPlanTimelineProps } from '../MTripShell'
 import type { MergedItem } from '../../../../utils/dayMerge'
 import type { RouteSegment } from '../../../../types'
 import type { Assignment } from '../../../../types'
 import type { ComponentType, ReactNode } from 'react'
 import GoogleMapsIcon from '../../../../components/shared/GoogleMapsIcon'
+import VoyaDayEditModal from '../../../../components/Planner/VoyaDayEditModal'
+import { useTripStore } from '../../../../store/tripStore'
 import { isRtlLanguage } from '../../../../i18n'
 import { useMPlanDaySwipe } from './useMPlanDaySwipe'
 
@@ -41,6 +42,7 @@ const GLASS_PILL = 'rounded-full border border-[color:var(--m-gbr)] bg-[color:va
 export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
   const tl = useMPlanTimeline(planner)
   const { t, trip, can } = planner
+  const [voyaEditOpen, setVoyaEditOpen] = useState(false)
   const canEdit = can('day_edit', trip)
   const editing = shell.mode === 'edit' && canEdit
   const canEditPlaces = can('place_edit', trip)
@@ -266,7 +268,9 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
 
         {tl.rows.length === 0 && !editing && (
           <div className="flex min-h-full flex-1 flex-col items-center justify-center py-8 text-center">
-            <MDancingTrek scene="guide" className="mb-2" />
+            <div aria-hidden className="voya-mobile-orb mb-4 flex h-[68px] w-[68px] items-center justify-center rounded-full">
+              <span className="voya-wordmark text-[28px] text-white">V</span>
+            </div>
             <p className="font-geist text-[0.8125rem] font-medium text-m-muted">{t('dayplan.emptyDay')}</p>
           </div>
         )}
@@ -284,9 +288,26 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
             <PlanAction icon={Route} label={t('dayplan.optimize')} onClick={() => void tl.optimize()} />
             <PlanAction icon={GoogleMapsIcon} label={t('mobileTrip.googleMaps')} onClick={tl.exportGoogleMaps} />
             <PlanAction icon={Compass} label={t('mobileTrip.coMaps')} onClick={tl.exportCoMaps} />
+            <PlanAction icon={Sparkles} label="Ask Voya" onClick={() => setVoyaEditOpen(true)} />
           </div>
         )}
       </div>
+
+      {day && (
+        <VoyaDayEditModal
+          isOpen={voyaEditOpen}
+          onClose={() => setVoyaEditOpen(false)}
+          tripId={planner.tripId}
+          dayId={day.id}
+          dayLabel={dayLabel}
+          assignments={planner.assignments[String(day.id)] || []}
+          onApplied={async () => {
+            await useTripStore.getState().loadTrip(planner.tripId)
+            planner.autoShowRoute()
+            planner.toast.success('Voya updated this day.')
+          }}
+        />
+      )}
     </div>
   )
 }
