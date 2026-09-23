@@ -309,6 +309,13 @@ export class VoyaAiService {
         });
 
         for (const activity of planDay.activities) {
+          // Inter-city movement is journey guidance, not a venue. Persisting a
+          // model-authored "Train to Florence" as a Place pollutes the pool and
+          // guarantees a failed provider-verification lookup. The transfer
+          // itself already lives in the day's notes above; only real stops become
+          // Places/Assignments.
+          if (planDay.isTransferDay && isTransferActivity(activity.category, activity.name)) continue;
+
           const suggestionNote = [
             'Suggested by Voya — verify current details before relying on them.',
             `Voya destination: ${destination}.`,
@@ -1551,3 +1558,9 @@ When a name is ambiguous, surface distinct interpretations instead of silently c
 Do not return businesses, hotels, airports, transit stations, attractions, or fictional places.
 Do not add live facts, prices, safety claims, visa information, or travel availability.
 Return only the requested structured result.`;
+
+
+function isTransferActivity(category: string, name: string): boolean {
+  const value = `${category} ${name}`.toLowerCase();
+  return /\b(transport|transfer|train|rail|flight|airport|ferry|bus|drive|driving)\b/.test(value);
+}
