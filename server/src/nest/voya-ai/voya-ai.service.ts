@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  type VoyaMaterializeDraftRequest,
   type VoyaPlanDraftRequest,
   type VoyaPlanDraftResponse,
   voyaPlanDraftResponseSchema,
@@ -7,6 +8,12 @@ import {
 import { z } from 'zod';
 import { LlmConfigResolver } from '../llm-parse/llm-config.resolver';
 import { StructuredGenerationService } from './structured-generation.service';
+import type { User } from '../../types';
+import { DatabaseService } from '../database/database.service';
+import { TripsService } from '../trips/trips.service';
+import { DaysService } from '../days/days.service';
+import { PlacesService } from '../places/places.service';
+import { AssignmentsService } from '../assignments/assignments.service';
 
 const generatedPlanSchema = voyaPlanDraftResponseSchema.omit({ generatedBy: true });
 
@@ -14,6 +21,13 @@ export class VoyaAiUnavailableError extends Error {
   constructor() {
     super('Voya AI is not configured. Enable the LLM integration and choose a model in Settings.');
     this.name = 'VoyaAiUnavailableError';
+  }
+}
+
+export class VoyaAiPermissionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'VoyaAiPermissionError';
   }
 }
 
@@ -29,6 +43,11 @@ export class VoyaAiService {
   constructor(
     private readonly configResolver: LlmConfigResolver,
     private readonly generator: StructuredGenerationService,
+    private readonly db: DatabaseService,
+    private readonly trips: TripsService,
+    private readonly days: DaysService,
+    private readonly places: PlacesService,
+    private readonly assignments: AssignmentsService,
   ) {}
 
   async planDraft(userId: number, request: VoyaPlanDraftRequest): Promise<VoyaPlanDraftResponse> {
@@ -63,6 +82,85 @@ export class VoyaAiService {
     }
 
     throw new VoyaAiInvalidDraftError('The model could not produce a valid Voya itinerary');
+  }
+
+  materializeDraft(user: User, body: VoyaMaterializeDraftRequest) {
+    const request = body.request;
+    const draft = voyaPlanDraftResponseSchema.parse(body.draft);
+    this.assertQuality(draft, request);
+
+    if (!this.trips.can('trip_create', user.role, null, user.id, false)) {
+      throw new VoyaAiPermissionError('No permission to create trips');
+    }
+
+    return this.db.transaction(() => {
+      const created = this.trips.create(user.id, {
+        title: draft.title,
+        description: draft.summary,
+        start_date: request.startDate ?? null,
+        end_date: request.endDate ?? null,
+        currency: request.currency,
+        reminder_days: body.reminderDays,
+        ...(!request.startDate && !request.endDate ? { day_count: request.days } : {}),
+      });
+
+      const tripId = created.tripId;
+      const storedDays = this.days.list(tripId).days;
+      if (storedDays.length !== draft.days.length) {
+        throw new VoyaAiInvalidDraftError(
+          `TREK created ${storedDays.length} days for a ${draft.days.length}-day Voya draft`,
+        );
+      }
+
+      for (let index = 0; index < draft.days.length; index++) {
+        const planDay = draft.days[index];
+        const storedDay = storedDays[index];
+
+        this.days.update(storedDay.id, storedDay, {
+          title: planDay.title,
+          notes: [planDay.objective, planDay.transportNote].filter(Boolean).join('\n\n'),
+        });
+
+        for (const activity of planDay.activities) {
+          const suggestionNote = [
+            'Suggested by Voya — verify current details before relying on them.',
+            activity.notes,
+            activity.reservationRecommended ? 'Reservation may be worth checking.' : '',
+            activity.priceLabel,
+          ].filter(Boolean).join(' ');
+
+          const place = this.places.create(String(tripId), {
+            name: activity.name,
+            description: activity.description,
+            address: activity.addressQuery || activity.area,
+            duration_minutes: activity.durationMin,
+            place_time: activity.startTime,
+            notes: suggestionNote,
+            ...(activity.priceKnown && activity.price !== undefined
+              ? { price: activity.price, currency: request.currency }
+              : {}),
+          });
+
+          this.assignments.createAssignment(
+            storedDay.id,
+            place.id,
+            suggestionNote,
+          );
+        }
+      }
+
+      const trip = this.trips.get(tripId, user.id);
+      if (!trip) throw new VoyaAiInvalidDraftError('Created trip could not be reloaded');
+
+      return {
+        trip,
+        days: this.days.list(tripId).days,
+        draft: {
+          ...draft,
+          generatedBy: body.draft.generatedBy,
+        },
+      };
+    });
   }
 
   private userPrompt(request: VoyaPlanDraftRequest, repair: string): string {
