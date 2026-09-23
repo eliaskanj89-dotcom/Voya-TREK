@@ -1832,6 +1832,43 @@ function isVoyaSuggestion(notes: string | null | undefined): boolean {
 }
 
 
+interface VoyaEditSnapshotPayload {
+  version: 1;
+  days: Array<{
+    day: Record<string, unknown> & { id: number };
+    assignments: Array<Record<string, unknown> & { id: number; order_index?: number | null }>;
+    participants: Array<{ assignment_id: number; user_id: number }>;
+    reservationLinks: Array<{ reservation_id: number; assignment_id: number }>;
+  }>;
+}
+
+function parseEditSnapshotPayload(value: string): VoyaEditSnapshotPayload {
+  try {
+    const parsed = JSON.parse(value) as Partial<VoyaEditSnapshotPayload>;
+    if (parsed.version !== 1 || !Array.isArray(parsed.days)) {
+      throw new Error('Unsupported snapshot format');
+    }
+    return parsed as VoyaEditSnapshotPayload;
+  } catch {
+    throw new VoyaAiInvalidDraftError('Voya edit snapshot is corrupted or unsupported');
+  }
+}
+
+function parseNumberArray(value: string): number[] {
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(Number).filter(Number.isFinite);
+  } catch {
+    return [];
+  }
+}
+
+function asNullableString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+
 interface VoyaReadinessRow {
   id: number;
   trip_id: number;
