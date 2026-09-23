@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import {
-  Archive, ArchiveRestore, ArrowRight, Bell, CalendarDays, CalendarPlus, Copy,
+  Archive, ArchiveRestore, ArrowRight, Bell, CalendarDays, CalendarPlus, Copy, Compass,
   LayoutGrid, List, MapPin, Pencil, Plus, RefreshCw, Trash2, Users,
 } from 'lucide-react'
 import { useTranslation } from '../../../i18n'
@@ -56,7 +56,7 @@ export default function MDashboard(): React.ReactElement {
     demoMode, locale, t, navigate,
     spotlight, upcoming, gridTrips, isLoading, loadError, retryLoad,
     tripFilter, setTripFilter, viewMode, toggleViewMode,
-    showForm, setShowForm, editingTrip, setEditingTrip,
+    showForm, setShowForm, createSeed, setCreateSeed, editingTrip, setEditingTrip,
     deleteTrip, setDeleteTrip, copyTrip, setCopyTrip, applyCoverUpdate,
     handleCreate, handleUpdate, confirmDelete, handleArchive, handleUnarchive, confirmCopy,
   } = useDashboard()
@@ -82,7 +82,7 @@ export default function MDashboard(): React.ReactElement {
 
   useEffect(() => { if (isAuthenticated) fetchUnreadCount() }, [isAuthenticated, fetchUnreadCount])
 
-  const openCreate = () => { setEditingTrip(null); setShowForm(true) }
+  const openCreate = () => { setCreateSeed(null); setEditingTrip(null); setShowForm(true) }
   const openEdit = (trip: DashboardTrip) => { setEditingTrip(trip); setShowForm(true) }
 
   const isArchivedFilter = tripFilter === 'archive'
@@ -181,6 +181,14 @@ export default function MDashboard(): React.ReactElement {
             >
               <Plus size={14} strokeWidth={2.4} />
               {t('dashboard.emptyButton')}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/discover')}
+              className="mt-2 flex items-center gap-[6px] rounded-full border border-[color:var(--m-gbr)] bg-[color:var(--m-glass)] px-4 py-[9px] text-[0.75rem] font-semibold text-m-ink"
+            >
+              <Compass size={14} strokeWidth={2.2} />
+              Help me choose
             </button>
           </div>
         )}
@@ -295,7 +303,9 @@ export default function MDashboard(): React.ReactElement {
       <MNewTripSheet
         open={showForm}
         trip={editingTrip}
-        onClose={() => { setShowForm(false); setEditingTrip(null) }}
+        initialDestination={!editingTrip ? createSeed?.destination : undefined}
+        initialDayCount={!editingTrip ? createSeed?.days : undefined}
+        onClose={() => { setShowForm(false); setEditingTrip(null); setCreateSeed(null) }}
         onSave={editingTrip ? handleUpdate : handleCreate}
         onCoverUpdate={applyCoverUpdate}
         onArchive={editingTrip
