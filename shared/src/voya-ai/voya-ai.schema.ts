@@ -168,3 +168,20 @@ export const voyaTripEditPlanSchema = z.object({
   }),
 });
 export type VoyaTripEditPlan = z.infer<typeof voyaTripEditPlanSchema>;
+
+
+export const voyaTravelerDnaSchema = z.object({
+  pace: z.enum(['relaxed', 'balanced', 'packed']).default('balanced'),
+  budgetStyle: z.enum(['budget', 'moderate', 'premium', 'luxury']).default('moderate'),
+  walkingTolerance: z.enum(['low', 'medium', 'high']).default('medium'),
+  morningStyle: z.enum(['slow', 'standard', 'early']).default('standard'),
+  nightlifeFrequency: z.enum(['never', 'sometimes', 'often']).default('sometimes'),
+  museumInterest: z.enum(['low', 'medium', 'high']).default('medium'),
+  foodStyle: z.array(z.string().trim().min(1).max(60)).max(8).default([]),
+  hotelStyle: z.array(z.string().trim().min(1).max(60)).max(8).default([]),
+  localPreference: z.number().int().min(0).max(100).default(70),
+  notes: z.string().trim().max(1000).default(''),
+});
+export type VoyaTravelerDna = z.infer<typeof voyaTravelerDnaSchema>;
+
+export const DEFAULT_VOYA_TRAVELER_DNA: VoyaTravelerDna = voyaTravelerDnaSchema.parse({});
