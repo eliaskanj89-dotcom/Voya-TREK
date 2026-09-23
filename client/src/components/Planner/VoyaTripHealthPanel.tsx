@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
-  HeartPulse,
-  MapPinCheck,
+  Sparkles,
+  MapPin,
   RefreshCw,
   Route,
   ShieldCheck,
-  TicketCheck,
-  TimerReset,
+  Ticket,
+  Clock,
 } from 'lucide-react'
 import type { VoyaTripHealthIssue, VoyaTripHealthResult } from '@trek/shared'
 import Modal from '../shared/Modal'
@@ -67,7 +67,7 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
       aria-label="Open Voya Trip Health"
       className="relative flex h-10 w-10 flex-none items-center justify-center rounded-full border border-[color:var(--m-gbr)] bg-[color:var(--m-glass)] text-m-muted backdrop-blur-[24px] backdrop-saturate-[1.7]"
     >
-      <HeartPulse size={17} strokeWidth={2.1} />
+      <Sparkles size={17} strokeWidth={2.1} />
       {highIssues > 0 && (
         <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#EF4444] px-1 text-[8px] font-bold text-white">
           {highIssues}
@@ -82,7 +82,7 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
       aria-label="Open Voya Trip Health"
     >
       <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#377CF6] text-white shadow-[0_7px_16px_rgba(55,124,246,.24)]">
-        <HeartPulse size={13} strokeWidth={2.4} />
+        <Sparkles size={13} strokeWidth={2.4} />
       </span>
       <span>
         <span className="block text-[10px] font-semibold uppercase tracking-[.12em] text-content-faint">Trip Health</span>
@@ -109,7 +109,7 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
         title={
           <span className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#377CF6] text-white shadow-[0_8px_20px_rgba(55,124,246,.24)]">
-              <HeartPulse size={16} strokeWidth={2.3} />
+              <Sparkles size={16} strokeWidth={2.3} />
             </span>
             <span>
               <span className="voya-editorial block text-[24px] font-medium tracking-[-.04em]">Trip Health</span>
@@ -152,11 +152,11 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-                  <Breakdown label="Verified" value={data.breakdown.verification} icon={MapPinCheck} />
-                  <Breakdown label="Timing" value={data.breakdown.schedule} icon={TimerReset} />
+                  <Breakdown label="Verified" value={data.breakdown.verification} icon={MapPin} />
+                  <Breakdown label="Timing" value={data.breakdown.schedule} icon={Clock} />
                   <Breakdown label="Route" value={data.breakdown.route} icon={Route} />
                   <Breakdown label="Ready" value={data.breakdown.readiness} icon={ShieldCheck} />
-                  <Breakdown label="Bookings" value={data.breakdown.reservation} icon={TicketCheck} />
+                  <Breakdown label="Bookings" value={data.breakdown.reservation} icon={Ticket} />
                 </div>
               </div>
             </div>
@@ -208,7 +208,7 @@ function Breakdown({
 }: {
   label: string
   value: number
-  icon: typeof HeartPulse
+  icon: typeof Sparkles
 }) {
   const tone = value >= 85 ? 'text-[#198754]' : value >= 65 ? 'text-[#377CF6]' : value >= 45 ? 'text-[#A16207] dark:text-[#FBBF24]' : 'text-[#DC2626]'
   return (
