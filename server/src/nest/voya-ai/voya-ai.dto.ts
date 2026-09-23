@@ -24,3 +24,5 @@ export class VoyaDestinationResolveDto extends createZodDto(voyaDestinationResol
 export class VoyaMultiCityPlanDto extends createZodDto(voyaMultiCityPlanRequestSchema) {}
 
 export class VoyaMaterializeMultiCityDraftDto extends createZodDto(voyaMaterializeMultiCityDraftRequestSchema) {}
+
+export class VoyaApplyTripEditDto extends createZodDto(voyaApplyTripEditRequestSchema) {}
