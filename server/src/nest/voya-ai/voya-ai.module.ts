@@ -14,7 +14,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { TodoModule } from '../todo/todo.module';
 
 @Module({
-  imports: [LlmParseModule, TripsModule, DaysModule, PlacesModule, AssignmentsDomainModule, MapsModule, SettingsModule, TodoModule],
+  imports: [LlmParseModule, TripsModule, DaysModule, PlacesModule, AssignmentsDomainModule, MapsModule, SettingsModule, TransitModule, RoadtripModule, TodoModule],
   controllers: [VoyaAiController],
   providers: [StructuredGenerationService, VoyaAiService],
   exports: [VoyaAiService],
