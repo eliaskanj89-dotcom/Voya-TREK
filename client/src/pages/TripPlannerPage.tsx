@@ -35,9 +35,11 @@ import { lazyWithRetry } from '../utils/lazyWithRetry'
 import { getDayBookendHotels } from '../utils/dayOrder'
 import TripWarningsBanner from '../components/Planner/TripWarningsBanner'
 import VoyaReadinessPanel from '../components/Planner/VoyaReadinessPanel'
+import VoyaTripEditModal from '../components/Planner/VoyaTripEditModal'
+import VoyaHistoryModal from '../components/Planner/VoyaHistoryModal'
 import Navbar from '../components/Layout/Navbar'
 import { useToast } from '../components/shared/Toast'
-import { Map, X, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Ticket, PackageCheck, Wallet, FolderOpen, Users, Train } from 'lucide-react'
+import { Map, X, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Ticket, PackageCheck, Wallet, FolderOpen, Users, Train, Sparkles, History } from 'lucide-react'
 import { useTranslation } from '../i18n'
 import { addonsApi, accommodationsApi, authApi, tripsApi, assignmentsApi, mapsApi } from '../api/client'
 import { accommodationRepo } from '../repo/accommodationRepo'
@@ -333,6 +335,8 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
 
   const poi = usePoiExplore()
   const [glMap, setGlMap] = useState<CompassMap | null>(null)
+  const [showVoyaTripEdit, setShowVoyaTripEdit] = useState(false)
+  const [showVoyaHistory, setShowVoyaHistory] = useState(false)
   // The corridor search draws into the same map channel and answers the same question for
   // a drive, so the explore pill stands down while road trip mode is on.
   // Also in road trip mode: searching the view is a different question from searching the
@@ -404,7 +408,52 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
           activeTab={activeTab}
           onChange={handleTabChange}
         />
+        {can('day_edit', trip) && (
+          <div className="absolute right-2 hidden items-center gap-1.5 lg:flex">
+            <button
+              type="button"
+              onClick={() => setShowVoyaTripEdit(true)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#377CF6] px-3 py-1.5 text-[11px] font-semibold text-white shadow-[0_8px_18px_rgba(55,124,246,.22)]"
+            >
+              <Sparkles size={12} />
+              Ask Voya
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowVoyaHistory(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-content-muted hover:text-[#377CF6] dark:bg-white/5"
+              aria-label="Voya history"
+            >
+              <History size={12} />
+              History
+            </button>
+          </div>
+        )}
       </div>
+
+      <VoyaTripEditModal
+        isOpen={showVoyaTripEdit}
+        onClose={() => setShowVoyaTripEdit(false)}
+        tripId={tripId}
+        tripTitle={trip.title}
+        days={days}
+        assignments={assignments}
+        onDayApplied={async (dayId) => {
+          await useTripStore.getState().loadTrip(tripId)
+          if (dayId) await updateRouteForDay(dayId)
+          toast.success('Voya updated the trip.')
+        }}
+      />
+      <VoyaHistoryModal
+        isOpen={showVoyaHistory}
+        onClose={() => setShowVoyaHistory(false)}
+        tripId={tripId}
+        onRestored={async () => {
+          await useTripStore.getState().loadTrip(tripId)
+          if (selectedDayId) await updateRouteForDay(selectedDayId)
+          toast.success('Voya restored the saved version.')
+        }}
+      />
 
       {/* Offset by navbar + tab bar (44px) */}
       <div className="voya-planner-stage" style={{ position: 'fixed', top: 'calc(var(--nav-h) + 44px)', left: 0, right: 0, bottom: 0, overflow: 'hidden', overscrollBehavior: 'contain' }}>
