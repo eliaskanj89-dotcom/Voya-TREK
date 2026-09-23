@@ -26,6 +26,7 @@ import {
   type TripCreateGuestRequest, type TripRenameGuestRequest, type AssignmentReorderRequest,
   type PackingReorderRequest, type PackingCreateBagRequest, type TodoReorderRequest,
   type TripCreateRequest, type TripUpdateRequest, type TripCopyRequest, type ActiveTripResponse,
+  type VoyaPlanDraftRequest, type VoyaPlanDraftResponse,
   type DayCreateRequest, type DayUpdateRequest, type DayReorderRequest,
   type PlaceCreateRequest, type PlaceUpdateRequest,
   type ReservationCreateRequest, type ReservationUpdateRequest,
@@ -406,6 +407,11 @@ export const oauthApi = {
     list: () => apiClient.get('/oauth/sessions').then(r => r.data),
     revoke: (id: number) => apiClient.delete(`/oauth/sessions/${id}`).then(r => r.data),
   },
+}
+
+export const voyaAiApi = {
+  planDraft: (data: VoyaPlanDraftRequest): Promise<{ draft: VoyaPlanDraftResponse }> =>
+    apiClient.post('/voya-ai/plan-draft', data, { timeout: 120000 }).then(r => r.data),
 }
 
 export const tripsApi = {
