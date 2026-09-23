@@ -149,7 +149,7 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
   const chrome = { editing, t, language: tl.language, timeFormat: tl.timeFormat }
 
   return (
-    <div ref={panelRef} className="absolute inset-0" {...daySwipe.handlers}>
+    <div ref={panelRef} className="voya-mobile-timeline absolute inset-0" {...daySwipe.handlers}>
       <ContextMenu menu={legMenu.menu} onClose={legMenu.close} />
       {/* Swipe-committed day changes only — a chip tap already speaks its own
           button label plus the aria-current flip, so announcing there would say
@@ -164,7 +164,7 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
       <div
         ref={cardRef}
         data-touch-drag={editing ? '' : undefined}
-        className="absolute left-4 right-4 overflow-y-auto overscroll-contain rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-3.5 pb-2 pt-1 backdrop-blur-[24px] backdrop-saturate-[1.6] bottom-[calc(env(safe-area-inset-bottom,0px)+90px)]"
+        className="voya-mobile-timeline-card absolute left-4 right-4 overflow-y-auto overscroll-contain rounded-[26px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-3.5 pb-2 pt-1 backdrop-blur-[24px] backdrop-saturate-[1.6] bottom-[calc(env(safe-area-inset-bottom,0px)+90px)]"
         style={{ top: `calc(var(--m-safe-top, 12px) + ${editing ? 140 : tl.upNext ? 216 : 102}px)` }}
       >
         {day && (
@@ -307,7 +307,7 @@ function UpNextCard({ tl, t, onOpen }: {
     <button
       type="button"
       onClick={() => onOpen(upNext.assignment)}
-      className="absolute left-4 right-4 cursor-pointer rounded-[22px] border border-[color:var(--m-inbr)] bg-[color:var(--m-inner)] px-4 py-3.5 text-left shadow-[0_18px_44px_-18px_rgba(0,0,0,.3)] backdrop-blur-[28px] backdrop-saturate-[1.8] top-[calc(var(--m-safe-top,12px)+102px)]"
+      className="voya-mobile-day-hero absolute left-4 right-4 cursor-pointer rounded-[26px] border border-[color:var(--m-inbr)] bg-[color:var(--m-inner)] px-4 py-3.5 text-left shadow-[0_18px_44px_-18px_rgba(0,0,0,.3)] backdrop-blur-[28px] backdrop-saturate-[1.8] top-[calc(var(--m-safe-top,12px)+102px)]"
     >
       <div className="flex items-center justify-between">
         <span className="whitespace-nowrap font-geist text-[0.65625rem] font-bold uppercase tracking-[.08em] text-m-muted">
@@ -327,7 +327,7 @@ function UpNextCard({ tl, t, onOpen }: {
                 {time}
               </span>
             )}
-            <span className="min-w-0 truncate text-[1.125rem] font-bold">{place?.name}</span>
+            <span className="voya-editorial min-w-0 truncate text-[1.25rem] font-medium tracking-[-.03em]">{place?.name}</span>
           </div>
           {sub && <MarkdownText clamp className="mt-[2px] font-geist text-[0.75rem] text-m-muted">{sub}</MarkdownText>}
         </div>
