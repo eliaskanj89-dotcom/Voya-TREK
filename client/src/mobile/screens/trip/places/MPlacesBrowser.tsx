@@ -57,7 +57,7 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
   const toast = useToast()
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [voyaVerifyBusy, setVoyaVerifyBusy] = useState(false)
-  const [voyaVerifySummary, setVoyaVerifySummary] = useState<{ verified: number; unresolved: number } | null>(null)
+  const [voyaVerifySummary, setVoyaVerifySummary] = useState<{ verified: number; unresolved: number; optimizedDays: number } | null>(null)
   const voyaSuggestionCount = useMemo(
     () => places.filter(place =>
       /Suggested by Voya — verify current details before relying on them\./i.test(place.notes || '')
@@ -70,10 +70,10 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
     setVoyaVerifyBusy(true)
     try {
       const result = await voyaAiApi.verifyTrip({ tripId: planner.tripId })
-      setVoyaVerifySummary({ verified: result.verified, unresolved: result.unresolved })
+      setVoyaVerifySummary({ verified: result.verified, unresolved: result.unresolved, optimizedDays: result.optimizedDays })
       await loadTrip(planner.tripId)
       if (result.verified > 0) {
-        toast.success(`Voya matched ${result.verified} suggestion${result.verified === 1 ? '' : 's'} to real map records.`)
+        toast.success(`Voya matched ${result.verified} suggestion${result.verified === 1 ? '' : 's'} to real map records${result.optimizedDays > 0 ? ` and optimized ${result.optimizedDays} day${result.optimizedDays === 1 ? '' : 's'}` : ''}.`)
       } else {
         toast.warning('Voya could not confidently match these suggestions yet.')
       }
@@ -279,7 +279,7 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
                 </p>
                 {voyaVerifySummary && (
                   <div className="mt-1.5 font-geist text-[0.625rem] font-medium text-m-muted">
-                    {voyaVerifySummary.verified} matched · {voyaVerifySummary.unresolved} unresolved
+                    {voyaVerifySummary.verified} matched · {voyaVerifySummary.unresolved} unresolved{voyaVerifySummary.optimizedDays > 0 ? ` · ${voyaVerifySummary.optimizedDays} day${voyaVerifySummary.optimizedDays === 1 ? '' : 's'} optimized` : ''}
                   </div>
                 )}
               </div>
