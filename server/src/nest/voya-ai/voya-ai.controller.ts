@@ -3,7 +3,7 @@ import type { User } from '../../types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StructuredGenerationError } from './structured-generation.service';
-import { VoyaApplyDayEditDto, VoyaApplyTripEditDto, VoyaDayEditDto, VoyaEditHistoryDto, VoyaMaterializeDraftDto, VoyaMaterializeMultiCityDraftDto, VoyaMultiCityPlanDto, VoyaPlanDraftDto, VoyaRestoreEditSnapshotDto, VoyaTripEditDto, VoyaVerifyTripDto, VoyaReadinessBuildDto, VoyaReadinessStatusDto, VoyaDestinationDiscoveryDto } from './voya-ai.dto';
+import { VoyaApplyDayEditDto, VoyaApplyTripEditDto, VoyaDayEditDto, VoyaEditHistoryDto, VoyaMaterializeDraftDto, VoyaMaterializeMultiCityDraftDto, VoyaMultiCityPlanDto, VoyaPlanDraftDto, VoyaRestoreEditSnapshotDto, VoyaTripEditDto, VoyaVerifyTripDto, VoyaReadinessBuildDto, VoyaReadinessStatusDto, VoyaReadinessToTodoDto, VoyaDestinationDiscoveryDto } from './voya-ai.dto';
 import {
   VoyaAiInvalidDraftError,
   VoyaAiPermissionError,
@@ -63,6 +63,22 @@ export class VoyaAiController {
       }
       console.error('Voya readiness refresh failed:', error instanceof Error ? error.message : 'unknown error');
       throw new HttpException({ error: 'Voya could not refresh trip readiness', code: 'VOYA_READINESS_ERROR' }, 500);
+    }
+  }
+
+  @Post('readiness-to-todo')
+  readinessToTodo(@CurrentUser() user: User, @Body() body: VoyaReadinessToTodoDto) {
+    try {
+      return this.voya.readinessToTodo(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_READINESS_ITEM_NOT_FOUND' }, 404);
+      }
+      console.error('Voya readiness-to-todo failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not add this readiness item to tasks', code: 'VOYA_READINESS_TODO_ERROR' }, 500);
     }
   }
 
