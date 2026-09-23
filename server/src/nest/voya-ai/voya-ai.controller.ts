@@ -3,9 +3,10 @@ import type { User } from '../../types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StructuredGenerationError } from './structured-generation.service';
-import { VoyaPlanDraftDto } from './voya-ai.dto';
+import { VoyaMaterializeDraftDto, VoyaPlanDraftDto } from './voya-ai.dto';
 import {
   VoyaAiInvalidDraftError,
+  VoyaAiPermissionError,
   VoyaAiService,
   VoyaAiUnavailableError,
 } from './voya-ai.service';
@@ -14,6 +15,22 @@ import {
 @UseGuards(JwtAuthGuard)
 export class VoyaAiController {
   constructor(private readonly voya: VoyaAiService) {}
+
+  @Post('materialize-draft')
+  materializeDraft(@CurrentUser() user: User, @Body() body: VoyaMaterializeDraftDto) {
+    try {
+      return this.voya.materializeDraft(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_INVALID_DRAFT' }, 400);
+      }
+      console.error('Voya AI materialization failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not create this trip', code: 'VOYA_AI_MATERIALIZE_ERROR' }, 500);
+    }
+  }
 
   @Post('plan-draft')
   async planDraft(@CurrentUser() user: User, @Body() body: VoyaPlanDraftDto) {
