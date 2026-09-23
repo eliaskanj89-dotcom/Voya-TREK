@@ -190,6 +190,9 @@ export const DEFAULT_VOYA_TRAVELER_DNA: VoyaTravelerDna = voyaTravelerDnaSchema.
 export const voyaReadinessKindSchema = z.enum(['Reserve', 'Verify', 'Transport', 'Hotel', 'Timing', 'Document', 'Other']);
 export const voyaReadinessPrioritySchema = z.enum(['High', 'Medium', 'Low']);
 export const voyaReadinessStatusSchema = z.enum(['To do', 'Done', 'Not needed']);
+export type VoyaReadinessKind = z.infer<typeof voyaReadinessKindSchema>;
+export type VoyaReadinessPriority = z.infer<typeof voyaReadinessPrioritySchema>;
+export type VoyaReadinessStatus = z.infer<typeof voyaReadinessStatusSchema>;
 
 export const voyaGeneratedReadinessItemSchema = z.object({
   title: z.string().trim().min(1).max(180),
