@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { RotateCcw, Save, Sparkles } from 'lucide-react'
 import { DEFAULT_VOYA_TRAVELER_DNA, voyaTravelerDnaSchema, type VoyaTravelerDna } from '@trek/shared'
 import { useSettingsStore } from '../../store/settingsStore'
@@ -189,7 +189,7 @@ export default function VoyaTravelerDnaTab() {
   )
 }
 
-function PreferenceCard({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+function PreferenceCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
     <div className="rounded-[22px] border border-edge-faint bg-white/60 p-5 dark:bg-white/4">
       <h3 className="text-body font-semibold text-content">{title}</h3>
