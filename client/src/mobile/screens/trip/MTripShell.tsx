@@ -21,6 +21,7 @@ import { stageOf } from '../../../components/Roadtrip/roadtripRowModel'
 import { badgeLabel, distanceBadge } from './roadtrip/stageBadges'
 import type { CorridorReach } from '../../../components/Roadtrip/corridorSearchModel'
 import { useSettingsStore } from '../../../store/settingsStore'
+import { useTripStore } from '../../../store/tripStore'
 import { useAuthStore } from '../../../store/authStore'
 import { canManageDocSync } from '../../../components/Files/docsync/useDocSync'
 import { useDocSyncOffered } from '../../../components/Files/docsync/useDocSyncOffered'
@@ -206,6 +207,21 @@ export default function MTripShell({
 }: MTripShellProps) {
   const planner = useTripPlanner()
   const { t, language, tripId, days, trip, navigate, packingItems, todoItems } = planner
+  const hydrateActiveTrip = useTripStore(s => s.hydrateActiveTrip)
+
+  useEffect(() => {
+    const refreshFromVoya = (event: Event) => {
+      const detail = (event as CustomEvent<{ tripId?: number }>).detail
+      if (detail?.tripId !== tripId) return
+      void hydrateActiveTrip(tripId)
+    }
+    window.addEventListener('voya:enrichment-complete', refreshFromVoya)
+    window.addEventListener('voya:places-verified', refreshFromVoya)
+    return () => {
+      window.removeEventListener('voya:enrichment-complete', refreshFromVoya)
+      window.removeEventListener('voya:places-verified', refreshFromVoya)
+    }
+  }, [tripId, hydrateActiveTrip])
 
   // Per-day colours from the dayTintProvider plugin hook — the mobile counterpart
   // of the desktop day-card wash, carried on the day chips. Empty without a plugin.
