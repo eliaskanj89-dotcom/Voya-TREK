@@ -27,7 +27,7 @@ import {
   type PackingReorderRequest, type PackingCreateBagRequest, type TodoReorderRequest,
   type TripCreateRequest, type TripUpdateRequest, type TripCopyRequest, type ActiveTripResponse,
   type VoyaPlanDraftRequest, type VoyaPlanDraftResponse, type VoyaApplyDayEditRequest, type VoyaDayEditDraft, type VoyaDayEditRequest,
-  type VoyaMaterializeDraftRequest, type VoyaTripEditPlan, type VoyaTripEditRequest, type VoyaVerifyTripRequest, type VoyaVerifyTripResult,
+  type VoyaMaterializeDraftRequest, type VoyaMaterializeMultiCityDraftRequest, type VoyaMultiCityPlanDraft, type VoyaMultiCityPlanRequest, type VoyaTripEditPlan, type VoyaTripEditRequest, type VoyaVerifyTripRequest, type VoyaVerifyTripResult,
   type VoyaReadinessBuildRequest, type VoyaReadinessResult, type VoyaReadinessStatusRequest,
   type VoyaDestinationDiscoveryRequest, type VoyaDestinationDiscoveryResult,
   type Trip, type Day,
@@ -424,6 +424,10 @@ export const voyaAiApi = {
     apiClient.post('/voya-ai/readiness-status', data).then(r => r.data),
   planDraft: (data: VoyaPlanDraftRequest): Promise<{ draft: VoyaPlanDraftResponse }> =>
     apiClient.post('/voya-ai/plan-draft', data, { timeout: 120000 }).then(r => r.data),
+  planMultiCityDraft: (data: VoyaMultiCityPlanRequest): Promise<{ draft: VoyaMultiCityPlanDraft }> =>
+    apiClient.post('/voya-ai/multi-city-draft', data, { timeout: 120000 }).then(r => r.data),
+  materializeMultiCityDraft: (data: VoyaMaterializeMultiCityDraftRequest): Promise<{ trip: Trip; days: Day[]; draft: VoyaMultiCityPlanDraft }> =>
+    apiClient.post('/voya-ai/materialize-multi-city-draft', data, { timeout: 120000 }).then(r => r.data),
   materializeDraft: (data: VoyaMaterializeDraftRequest): Promise<{ trip: Trip; days: Day[]; draft: VoyaPlanDraftResponse }> =>
     apiClient.post('/voya-ai/materialize-draft', data, { timeout: 120000 }).then(r => r.data),
   verifyTrip: (data: VoyaVerifyTripRequest): Promise<VoyaVerifyTripResult> =>
