@@ -3,7 +3,7 @@ import type { User } from '../../types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StructuredGenerationError } from './structured-generation.service';
-import { VoyaMaterializeDraftDto, VoyaPlanDraftDto } from './voya-ai.dto';
+import { VoyaMaterializeDraftDto, VoyaPlanDraftDto, VoyaVerifyTripDto } from './voya-ai.dto';
 import {
   VoyaAiInvalidDraftError,
   VoyaAiPermissionError,
@@ -29,6 +29,19 @@ export class VoyaAiController {
       }
       console.error('Voya AI materialization failed:', error instanceof Error ? error.message : 'unknown error');
       throw new HttpException({ error: 'Voya could not create this trip', code: 'VOYA_AI_MATERIALIZE_ERROR' }, 500);
+    }
+  }
+
+  @Post('verify-trip')
+  async verifyTrip(@CurrentUser() user: User, @Body() body: VoyaVerifyTripDto) {
+    try {
+      return await this.voya.verifyTrip(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      console.error('Voya trip verification failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not verify this trip right now', code: 'VOYA_AI_VERIFY_ERROR' }, 500);
     }
   }
 
