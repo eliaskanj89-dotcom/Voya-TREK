@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ArrowDown, ArrowRight, ArrowUp, Check, ChevronDown, MapPin, Plus, Sparkles, Trash2 } from 'lucide-react'
-import type { Trip, VoyaMultiCityPlanDraft, VoyaMultiCityPlanRequest, VoyaPlanDraftRequest, VoyaPlanDraftResponse } from '@trek/shared'
+import type { Trip, VoyaMultiCityPlanDraft, VoyaMultiCityPlanRequest, VoyaPlanDraftRequest, VoyaPlanDraftResponse, VoyaResolvedDestination } from '@trek/shared'
 import { tripSpanDays } from '@trek/shared'
 import { voyaAiApi } from '../../../api/client'
 import { startVoyaEnrichment } from '../../../services/voyaEnrichment'
@@ -52,6 +52,8 @@ export default function MVoyaPlanComposer({
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [needsAiSetup, setNeedsAiSetup] = useState(false)
+  const [destinationMatches, setDestinationMatches] = useState<VoyaResolvedDestination[]>([])
+  const [resolvingDestination, setResolvingDestination] = useState(false)
 
   useEffect(() => {
     setDestination(initialDestination)
@@ -79,6 +81,31 @@ export default function MVoyaPlanComposer({
     () => startDate && endDate ? tripSpanDays(startDate, endDate) : Math.max(1, dayCount || 7),
     [startDate, endDate, dayCount],
   )
+
+  const resolveDestination = async () => {
+    const query = destination.trim()
+    if (query.length < 2) {
+      setDestinationMatches([])
+      return
+    }
+    setResolvingDestination(true)
+    setError('')
+    setNeedsAiSetup(false)
+    try {
+      const result = await voyaAiApi.resolveDestination({ query })
+      setDestinationMatches(result.suggestions)
+    } catch (err: unknown) {
+      setNeedsAiSetup(isVoyaAiNotConfigured(err))
+      setError(getApiErrorMessage(err, 'Voya could not find destination matches right now.'))
+    } finally {
+      setResolvingDestination(false)
+    }
+  }
+
+  const chooseDestinationMatch = (match: VoyaResolvedDestination) => {
+    setDestination(match.searchTerm)
+    setDestinationMatches([])
+  }
 
   const generate = async () => {
     setGenerating(true)
@@ -249,11 +276,42 @@ export default function MVoyaPlanComposer({
                 <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-m-act" />
                 <input
                   value={destination}
-                  onChange={event => setDestination(event.target.value)}
+                  onChange={event => {
+                    setDestination(event.target.value)
+                    setDestinationMatches([])
+                  }}
                   placeholder="Tokyo, Japan"
                   className="w-full rounded-[14px] border border-[color:var(--m-rowbr)] bg-[color:var(--m-ic)] py-2.5 pl-9 pr-3 text-[0.8125rem] font-semibold text-m-ink outline-none"
                 />
               </div>
+              <button
+                type="button"
+                onClick={() => { void resolveDestination() }}
+                disabled={resolvingDestination || destination.trim().length < 2}
+                className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[color:var(--m-rowbr)] px-2.5 py-1.5 font-geist text-[0.5625rem] font-bold text-m-act disabled:opacity-40"
+              >
+                <MapPin size={10} />
+                {resolvingDestination ? 'Finding matches…' : 'Find destination matches'}
+              </button>
+              {destinationMatches.length > 0 && (
+                <div className="mt-1.5 space-y-1.5">
+                  {destinationMatches.map(match => (
+                    <button
+                      type="button"
+                      key={`${match.name}|${match.country}|${match.region || ''}`}
+                      onClick={() => chooseDestinationMatch(match)}
+                      className="w-full rounded-[14px] border border-[color:var(--m-rowbr)] bg-[color:var(--m-ic)] px-3 py-2.5 text-left"
+                    >
+                      <div className="font-geist text-[0.6875rem] font-bold text-m-ink">{match.name}</div>
+                      <div className="mt-0.5 font-geist text-[0.5rem] font-bold uppercase tracking-[.08em] text-m-faint">
+                        {[match.region, match.country].filter(Boolean).join(' · ')}
+                      </div>
+                      <div className="mt-1 font-geist text-[0.5625rem] leading-relaxed text-m-muted">{match.subtitle}</div>
+                      {match.disambiguation && <div className="mt-1 font-geist text-[0.5rem] font-semibold text-m-act">{match.disambiguation}</div>}
+                    </button>
+                  ))}
+                </div>
+              )}
             </MobileField>
           ) : (
             <MobileField label="Journey order">
