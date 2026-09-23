@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { ArrowDown, ArrowRight, ArrowUp, Check, MapPin, Plus, Sparkles, Trash2 } from 'lucide-react'
 import type { Trip, VoyaMultiCityPlanDraft, VoyaMultiCityPlanRequest, VoyaPlanDraftRequest, VoyaPlanDraftResponse } from '@trek/shared'
 import { tripSpanDays } from '@trek/shared'
@@ -6,6 +7,7 @@ import { voyaAiApi } from '../../api/client'
 import { startVoyaEnrichment } from '../../services/voyaEnrichment'
 import { getApiErrorMessage } from '../../types'
 import { useSettingsStore } from '../../store/settingsStore'
+import { isVoyaAiNotConfigured } from '../../utils/voyaAiErrors'
 
 interface VoyaPlanComposerProps {
   initialDestination: string
@@ -36,6 +38,7 @@ export default function VoyaPlanComposer({
   initialNotes = '',
   onCreated,
 }: VoyaPlanComposerProps) {
+  const navigate = useNavigate()
   const travelerDna = useSettingsStore(state => state.settings.voya_traveler_dna)
   const [expanded, setExpanded] = useState(autoExpand)
   const [tripMode, setTripMode] = useState<'single' | 'multi'>('single')
@@ -52,6 +55,7 @@ export default function VoyaPlanComposer({
   const [generating, setGenerating] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+  const [needsAiSetup, setNeedsAiSetup] = useState(false)
 
   useEffect(() => {
     if (initialDestination.trim()) {
@@ -163,6 +167,7 @@ export default function VoyaPlanComposer({
   const generate = async () => {
     setGenerating(true)
     setError('')
+    setNeedsAiSetup(false)
     setDraft(null)
     setMultiDraft(null)
     try {
@@ -180,6 +185,7 @@ export default function VoyaPlanComposer({
         setDraft(result.draft)
       }
     } catch (err: unknown) {
+      setNeedsAiSetup(isVoyaAiNotConfigured(err))
       setError(getApiErrorMessage(err, tripMode === 'multi'
         ? 'Voya could not generate this multi-city journey right now.'
         : 'Voya could not generate this trip right now.'))
@@ -511,7 +517,22 @@ export default function VoyaPlanComposer({
         </div>
       )}
 
-      {error && <div className="mx-5 mb-5 rounded-2xl border border-danger/20 bg-danger-soft px-4 py-3 text-caption text-danger">{error}</div>}
+      {error && (
+        <div className="mx-5 mb-5 rounded-2xl border border-danger/20 bg-danger-soft px-4 py-3 text-caption text-danger">
+          <div>{error}</div>
+          {needsAiSetup && (
+            <button
+              type="button"
+              onClick={() => navigate('/settings?tab=integrations')}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#377CF6] px-3.5 py-2 text-[11px] font-semibold text-white shadow-[0_8px_18px_rgba(55,124,246,.20)]"
+            >
+              <Sparkles size={12} />
+              Set up Voya AI
+              <ArrowRight size={12} />
+            </button>
+          )}
+        </div>
+      )}
     </section>
   )
 }
