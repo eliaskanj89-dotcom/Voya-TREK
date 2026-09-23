@@ -675,7 +675,7 @@ export class VoyaAiService {
         assignmentId: a.id,
         name: a.place?.name || '',
         time: a.place?.place_time || null,
-        protected: a.accommodation_id != null,
+        protected: this.assignmentProtectedFromAiEdit(a),
       })),
     }));
 
@@ -746,7 +746,7 @@ export class VoyaAiService {
       endTime: a.place?.end_time || null,
       durationMin: a.place?.duration_minutes || null,
       notes: a.notes || null,
-      protected: a.accommodation_id != null,
+      protected: this.assignmentProtectedFromAiEdit(a),
     }));
 
     let repair = '';
@@ -1338,12 +1338,27 @@ export class VoyaAiService {
     return out;
   }
 
+  private assignmentProtectedFromAiEdit(assignment: {
+    id: number;
+    accommodation_id?: number | null;
+    reservation_status?: string | null;
+    reservation_datetime?: string | null;
+  }): boolean {
+    if (assignment.accommodation_id != null) return true;
+    if (assignment.reservation_datetime) return true;
+    if (assignment.reservation_status && assignment.reservation_status !== 'none') return true;
+    return !!this.db.get<{ id: number }>(
+      'SELECT id FROM reservations WHERE assignment_id = ? LIMIT 1',
+      assignment.id,
+    );
+  }
+
   private assertDayEditDraft(
     draft: VoyaDayEditDraft,
     current: ReturnType<AssignmentsService['listDayAssignments']>,
   ): void {
     const currentIds = new Set(current.map(a => a.id));
-    const protectedIds = new Set(current.filter(a => a.accommodation_id != null).map(a => a.id));
+    const protectedIds = new Set(current.filter(a => this.assignmentProtectedFromAiEdit(a)).map(a => a.id));
     const sequenceIds = draft.sequence
       .filter(item => item.kind === 'existing')
       .map(item => item.assignmentId);
