@@ -3,7 +3,7 @@ import type { User } from '../../types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StructuredGenerationError } from './structured-generation.service';
-import { VoyaApplyDayEditDto, VoyaDayEditDto, VoyaMaterializeDraftDto, VoyaPlanDraftDto, VoyaTripEditDto, VoyaVerifyTripDto, VoyaReadinessBuildDto, VoyaReadinessStatusDto } from './voya-ai.dto';
+import { VoyaApplyDayEditDto, VoyaDayEditDto, VoyaMaterializeDraftDto, VoyaPlanDraftDto, VoyaTripEditDto, VoyaVerifyTripDto, VoyaReadinessBuildDto, VoyaReadinessStatusDto, VoyaDestinationDiscoveryDto } from './voya-ai.dto';
 import {
   VoyaAiInvalidDraftError,
   VoyaAiPermissionError,
@@ -15,6 +15,25 @@ import {
 @UseGuards(JwtAuthGuard)
 export class VoyaAiController {
   constructor(private readonly voya: VoyaAiService) {}
+
+  @Post('discover-destinations')
+  async discoverDestinations(@CurrentUser() user: User, @Body() body: VoyaDestinationDiscoveryDto) {
+    try {
+      return await this.voya.discoverDestinations(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiUnavailableError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_NOT_CONFIGURED' }, 409);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_DISCOVERY_INVALID_RESULT' }, 502);
+      }
+      if (error instanceof StructuredGenerationError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_PROVIDER_ERROR' }, 502);
+      }
+      console.error('Voya destination discovery failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not discover destinations right now', code: 'VOYA_DISCOVERY_ERROR' }, 500);
+    }
+  }
 
   @Post('readiness')
   readiness(@CurrentUser() user: User, @Body() body: VoyaReadinessBuildDto) {
