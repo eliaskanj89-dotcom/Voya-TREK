@@ -4,6 +4,7 @@ import type { VoyaTransportAdviceResult } from '@trek/shared'
 import type { Day } from '../../types'
 import { voyaAiApi } from '../../api/client'
 import { getApiErrorMessage } from '../../types'
+import { useDestinationVisual } from '../../hooks/useDestinationVisual'
 
 interface JourneySegment {
   destination: string
@@ -128,23 +129,12 @@ export default function VoyaJourneyStrip({
                   <span className="truncate">{segment.transfer?.replace(/\.\s*$/, '') || 'Compare transfer'}</span>
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => onSelectDay(segment.firstDayId)}
-                className={`rounded-[14px] border px-3 py-2 text-left transition-all ${
-                  active
-                    ? 'border-[#377CF6]/25 bg-[#377CF6] text-white shadow-[0_8px_18px_rgba(55,124,246,.20)]'
-                    : 'border-edge-faint bg-white/60 text-content hover:border-[#377CF6]/20 dark:bg-white/4'
-                }`}
-              >
-                <div className={`text-[8px] font-semibold uppercase tracking-[.1em] ${active ? 'text-white/55' : 'text-content-faint'}`}>
-                  Stop {index + 1}
-                </div>
-                <div className="max-w-[120px] truncate text-[11px] font-semibold">{segment.destination}</div>
-                <div className={`text-[9px] ${active ? 'text-white/65' : 'text-content-faint'}`}>
-                  {segment.dayCount} day{segment.dayCount === 1 ? '' : 's'}
-                </div>
-              </button>
+              <JourneyStopCard
+                segment={segment}
+                index={index}
+                active={active}
+                onSelect={() => onSelectDay(segment.firstDayId)}
+              />
             </div>
           )
         })}
@@ -236,5 +226,87 @@ export default function VoyaJourneyStrip({
         </div>
       )}
     </section>
+  )
+}
+
+
+function JourneyStopCard({
+  segment,
+  index,
+  active,
+  onSelect,
+}: {
+  segment: JourneySegment
+  index: number
+  active: boolean
+  onSelect: () => void
+}) {
+  const { visual, loading } = useDestinationVisual(
+    segment.destination,
+    segment.country || '',
+    [segment.destination, segment.country].filter(Boolean).join(', '),
+  )
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`group relative min-w-[132px] overflow-hidden rounded-[16px] border text-left transition-all ${
+        active
+          ? 'border-[#377CF6]/30 shadow-[0_9px_22px_rgba(55,124,246,.22)]'
+          : 'border-edge-faint hover:-translate-y-px hover:border-[#377CF6]/20'
+      }`}
+    >
+      {visual ? (
+        <>
+          <img
+            src={visual.url}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+          />
+          <div className={`absolute inset-0 ${
+            active
+              ? 'bg-[linear-gradient(180deg,rgba(18,64,132,.22),rgba(24,84,187,.80))]'
+              : 'bg-[linear-gradient(180deg,rgba(4,17,33,.18),rgba(4,17,33,.76))]'
+          }`} />
+        </>
+      ) : (
+        <>
+          <div className={`absolute inset-0 ${
+            active
+              ? 'bg-[linear-gradient(145deg,#4D8DF9,#286CE4)]'
+              : 'bg-[linear-gradient(145deg,rgba(243,249,255,.96),rgba(230,241,255,.88))] dark:bg-[linear-gradient(145deg,rgba(18,38,64,.94),rgba(9,24,42,.90))]'
+          }`} />
+          {loading && !active && (
+            <div className="absolute inset-0 animate-pulse bg-[linear-gradient(100deg,transparent_15%,rgba(255,255,255,.45)_44%,transparent_72%)] bg-[length:220%_100%]" />
+          )}
+        </>
+      )}
+
+      <div className="relative z-10 px-3 py-2.5">
+        <div className={`text-[8px] font-semibold uppercase tracking-[.1em] ${
+          visual || active ? 'text-white/58' : 'text-content-faint'
+        }`}>
+          Stop {index + 1}
+        </div>
+        <div className={`mt-0.5 max-w-[118px] truncate text-[11px] font-semibold ${
+          visual || active ? 'text-white' : 'text-content'
+        }`}>
+          {segment.destination}
+        </div>
+        <div className={`mt-0.5 text-[9px] ${
+          visual || active ? 'text-white/68' : 'text-content-faint'
+        }`}>
+          {segment.dayCount} day{segment.dayCount === 1 ? '' : 's'}
+        </div>
+      </div>
+
+      {visual && (
+        <div
+          className="absolute bottom-1.5 right-1.5 z-20 h-1.5 w-1.5 rounded-full bg-white/65 shadow-[0_0_0_2px_rgba(0,0,0,.16)]"
+          title={visual.source === 'google' ? 'Google photo' : `${visual.source} photo`}
+        />
+      )}
+    </button>
   )
 }
