@@ -182,6 +182,7 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
               days={planner.days}
               assignments={planner.assignments}
               accommodations={planner.tripAccommodations}
+              reservations={planner.reservations}
               selectedDayId={planner.selectedDayId}
               onOpenToday={(todayDayId) => planner.handleSelectDay(todayDayId, true)}
               onRouteRefresh={() => planner.autoShowRoute()}
