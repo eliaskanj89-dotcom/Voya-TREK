@@ -27,6 +27,8 @@ import type { ComponentType, ReactNode } from 'react'
 import GoogleMapsIcon from '../../../../components/shared/GoogleMapsIcon'
 import VoyaDayEditModal from '../../../../components/Planner/VoyaDayEditModal'
 import VoyaTripEditModal from '../../../../components/Planner/VoyaTripEditModal'
+import VoyaLiveTripCard from '../../../../components/Planner/VoyaLiveTripCard'
+import { findTodayDayId } from '../../../../components/Planner/today'
 import { useTripStore } from '../../../../store/tripStore'
 import { isRtlLanguage } from '../../../../i18n'
 import { useMPlanDaySwipe } from './useMPlanDaySwipe'
@@ -66,6 +68,8 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
   const daySchedule = usePluginDaySchedule(planner.tripId)
   const day = tl.day
   const dayId = day?.id
+  const liveTodayDayId = findTodayDayId(planner.days)
+  const liveTripActive = liveTodayDayId != null
   // A stay chip opens the stay, the same way the stay card in the day sheet
   // does: the editor for members who may edit days, otherwise the hotel's
   // place. A stay with neither still leads to the day sheet, so the chip
@@ -159,7 +163,7 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
           button label plus the aria-current flip, so announcing there would say
           the day twice. */}
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">{daySwipe.announcement}</span>
-      {!editing && <UpNextCard tl={tl} t={t} onOpen={openPlace} />}
+      {!editing && !liveTripActive && <UpNextCard tl={tl} t={t} onOpen={openPlace} />}
       {editing && <EditHeader tl={tl} planner={planner} shell={shell} />}
 
       {/* Timeline card — go mode leaves room for the UP-NEXT card above, but
@@ -169,8 +173,23 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
         ref={cardRef}
         data-touch-drag={editing ? '' : undefined}
         className="voya-mobile-timeline-card absolute left-4 right-4 overflow-y-auto overscroll-contain rounded-[26px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-3.5 pb-2 pt-1 backdrop-blur-[24px] backdrop-saturate-[1.6] bottom-[calc(env(safe-area-inset-bottom,0px)+90px)]"
-        style={{ top: `calc(var(--m-safe-top, 12px) + ${editing ? 140 : tl.upNext ? 216 : 102}px)` }}
+        style={{ top: `calc(var(--m-safe-top, 12px) + ${editing ? 140 : (!liveTripActive && tl.upNext ? 216 : 102)}px)` }}
       >
+        {liveTripActive && (
+          <div className="pb-2 pt-1">
+            <VoyaLiveTripCard
+              tripId={planner.tripId}
+              days={planner.days}
+              assignments={planner.assignments}
+              accommodations={planner.tripAccommodations}
+              selectedDayId={planner.selectedDayId}
+              onOpenToday={(todayDayId) => planner.handleSelectDay(todayDayId, true)}
+              onRouteRefresh={() => planner.autoShowRoute()}
+              compact
+            />
+          </div>
+        )}
+
         {day && (
           <TimelineHeader
             tl={tl}
