@@ -711,8 +711,10 @@ export default function MTripShell({
         {MAP_TABS.has(trTab) ? (
           <div className="flex flex-none items-center gap-2">
             {trTab === 'plan' && (
-              <MVoyaReadinessButton tripId={tripId} onOpen={() => openSheet('readiness')} />
-              <VoyaTripHealthPanel tripId={tripId} mobile />
+              <>
+                <MVoyaReadinessButton tripId={tripId} onOpen={() => openSheet('readiness')} />
+                <VoyaTripHealthPanel tripId={tripId} mobile />
+              </>
             )}
             <MIconBtn
               ariaLabel={mapFront ? t('mobileTrip.listView') : t('mobileTrip.mapView')}
