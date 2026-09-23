@@ -273,3 +273,29 @@ export const voyaDestinationDiscoveryResultSchema = z.object({
   }),
 });
 export type VoyaDestinationDiscoveryResult = z.infer<typeof voyaDestinationDiscoveryResultSchema>;
+
+
+export const voyaDestinationResolveRequestSchema = z.object({
+  query: z.string().trim().min(2).max(180),
+});
+export type VoyaDestinationResolveRequest = z.infer<typeof voyaDestinationResolveRequestSchema>;
+
+export const voyaResolvedDestinationSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  country: z.string().trim().min(1).max(100),
+  region: z.string().trim().max(120).optional(),
+  type: z.enum(['City', 'Country', 'Island', 'Region', 'Town', 'State', 'Province', 'Other']),
+  disambiguation: z.string().trim().max(180).optional(),
+  subtitle: z.string().trim().min(1).max(220),
+  searchTerm: z.string().trim().min(1).max(180),
+});
+export type VoyaResolvedDestination = z.infer<typeof voyaResolvedDestinationSchema>;
+
+export const voyaDestinationResolveResultSchema = z.object({
+  suggestions: z.array(voyaResolvedDestinationSchema).min(1).max(6),
+  generatedBy: z.object({
+    provider: z.enum(['local', 'openai', 'anthropic']),
+    model: z.string().min(1),
+  }),
+});
+export type VoyaDestinationResolveResult = z.infer<typeof voyaDestinationResolveResultSchema>;
