@@ -30,6 +30,7 @@ import {
   type VoyaMaterializeDraftRequest, type VoyaMaterializeMultiCityDraftRequest, type VoyaMultiCityPlanDraft, type VoyaMultiCityPlanRequest, type VoyaTripEditPlan, type VoyaTripEditRequest, type VoyaVerifyTripRequest, type VoyaVerifyTripResult,
   type VoyaReadinessBuildRequest, type VoyaReadinessResult, type VoyaReadinessStatusRequest, type VoyaReadinessToTodoRequest, type VoyaReadinessToTodoResult,
   type VoyaDestinationDiscoveryRequest, type VoyaDestinationDiscoveryResult,
+  type VoyaDestinationResolveRequest, type VoyaDestinationResolveResult,
   type Trip, type Day,
   type DayCreateRequest, type DayUpdateRequest, type DayReorderRequest,
   type PlaceCreateRequest, type PlaceUpdateRequest,
@@ -416,6 +417,8 @@ export const oauthApi = {
 export const voyaAiApi = {
   discoverDestinations: (data: VoyaDestinationDiscoveryRequest): Promise<VoyaDestinationDiscoveryResult> =>
     apiClient.post('/voya-ai/discover-destinations', data, { timeout: 120000 }).then(r => r.data),
+  resolveDestination: (data: VoyaDestinationResolveRequest): Promise<VoyaDestinationResolveResult> =>
+    apiClient.post('/voya-ai/resolve-destination', data, { timeout: 120000 }).then(r => r.data),
   tripHealth: (data: VoyaTripHealthRequest): Promise<VoyaTripHealthResult> =>
     apiClient.post('/voya-ai/trip-health', data).then(r => r.data),
   readiness: (data: VoyaReadinessBuildRequest): Promise<VoyaReadinessResult> =>
