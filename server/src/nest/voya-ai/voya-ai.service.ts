@@ -4,6 +4,9 @@ import {
   type VoyaDayEditDraft,
   type VoyaDayEditRequest,
   type VoyaMaterializeDraftRequest,
+  type VoyaMaterializeMultiCityDraftRequest,
+  type VoyaMultiCityPlanDraft,
+  type VoyaMultiCityPlanRequest,
   type VoyaPlanDraftRequest,
   type VoyaPlanDraftResponse,
   type VoyaVerifyTripRequest,
@@ -21,6 +24,7 @@ import {
   type VoyaReadinessStatusRequest,
   voyaGeneratedReadinessItemSchema,
   voyaDestinationDiscoveryResultSchema,
+  voyaMultiCityPlanDraftSchema,
   voyaDestinationResolveResultSchema,
   voyaDayEditDraftSchema,
   voyaPlanDraftResponseSchema,
@@ -40,6 +44,7 @@ import { MapsService } from '../maps/maps.service';
 import { SettingsService } from '../settings/settings.service';
 
 const generatedPlanSchema = voyaPlanDraftResponseSchema.omit({ generatedBy: true });
+const generatedMultiCityPlanSchema = voyaMultiCityPlanDraftSchema.omit({ generatedBy: true });
 const generatedDayEditSchema = voyaDayEditDraftSchema.omit({ tripId: true, dayId: true, generatedBy: true });
 const generatedTripEditPlanSchema = voyaTripEditPlanSchema.omit({ tripId: true, generatedBy: true });
 const generatedReadinessSchema = z.object({
@@ -188,6 +193,153 @@ export class VoyaAiService {
     }
 
     throw new VoyaAiInvalidDraftError('Voya could not produce destination ideas');
+  }
+
+  async planMultiCityDraft(userId: number, request: VoyaMultiCityPlanRequest): Promise<VoyaMultiCityPlanDraft> {
+    const config = this.configResolver.resolve(userId);
+    if (!config) throw new VoyaAiUnavailableError();
+    const travelerDna = this.travelerDna(userId);
+
+    let repair = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const raw = await this.generator.generate(config, {
+        system: MULTI_CITY_SYSTEM_PROMPT,
+        user: [
+          `Plan one coherent ${request.days}-day multi-city trip.`,
+          `Requested destinations: ${request.destinations.map((d, index) => `${index + 1}. ${d.name}${d.country ? `, ${d.country}` : ''}`).join(' | ')}.`,
+          request.allowReorder
+            ? 'You may reorder the destinations only when the route becomes materially more practical; explain the reason in orderReason.'
+            : 'Keep the destinations in exactly the requested order.',
+          request.startDate ? `Start date: ${request.startDate}.` : '',
+          request.endDate ? `End date: ${request.endDate}.` : '',
+          `Travelers: ${request.travelers}. Pace: ${request.pace}. Budget style: ${request.budgetStyle}. Currency: ${request.currency}.`,
+          this.travelerDnaPrompt(travelerDna),
+          request.interests.length ? `Interests: ${request.interests.join(', ')}.` : '',
+          request.notes ? `Traveler notes: ${request.notes}` : '',
+          'Create exactly one leg for every requested destination and exactly the requested total number of days.',
+          'allocatedDays across all legs MUST sum exactly to the requested trip days.',
+          'The days array MUST contain exactly the requested number of days and each day MUST name its destination and country.',
+          'Every day belongs to exactly one leg. The number of days assigned to each destination MUST equal that leg allocatedDays.',
+          'The first day in every leg after the first MUST have isTransferDay=true. Other days should normally be false.',
+          'Transfer days must be lighter than normal sightseeing days and should include a transport/transfer activity plus limited local plans after arrival.',
+          'transportFromPrevious is qualitative only: Train, Flight, Drive, Ferry, Bus, or Transfer/Depends.',
+          'Do NOT invent exact train/flight numbers, departure times, live fares, ticket availability, seats, or booking confirmation.',
+          'transferDurationLabel must be approximate language only when you are confident about the broad journey duration; otherwise use "Verify current schedule".',
+          'Never claim live opening hours, current availability, visa rules, or reservation confirmation.',
+          'Every generated activity is Suggested. Set priceKnown=false and omit numeric price. Qualitative price labels are allowed.',
+          'Avoid repeating named restaurants, cafes, museums, landmarks, or attractions anywhere across cities.',
+          'Use realistic geographic clustering inside each destination and preserve breathing room on transfer days.',
+          repair ? `Previous multi-city draft failed validation. Correct these issues: ${repair}` : '',
+        ].filter(Boolean).join('\n'),
+        jsonSchema: z.toJSONSchema(generatedMultiCityPlanSchema),
+      });
+
+      try {
+        const normalized = this.normalizeMultiCity(raw, request);
+        const parsed = generatedMultiCityPlanSchema.parse(normalized);
+        const draft: VoyaMultiCityPlanDraft = {
+          ...parsed,
+          generatedBy: { provider: config.provider, model: config.model },
+        };
+        this.assertMultiCityQuality(draft, request);
+        return draft;
+      } catch (error) {
+        if (attempt === 1) {
+          const detail = error instanceof Error ? error.message : 'unknown validation error';
+          throw new VoyaAiInvalidDraftError(`The model could not produce a valid multi-city Voya itinerary: ${detail}`);
+        }
+        repair = this.validationMessage(error);
+      }
+    }
+
+    throw new VoyaAiInvalidDraftError('The model could not produce a valid multi-city itinerary');
+  }
+
+  materializeMultiCityDraft(user: User, body: VoyaMaterializeMultiCityDraftRequest) {
+    const request = body.request;
+    const draft = voyaMultiCityPlanDraftSchema.parse(body.draft);
+    this.assertMultiCityQuality(draft, request);
+
+    if (!this.trips.can('trip_create', user.role, null, user.id, false)) {
+      throw new VoyaAiPermissionError('No permission to create trips');
+    }
+
+    return this.db.transaction(() => {
+      const created = this.trips.create(user.id, {
+        title: draft.title,
+        description: [draft.summary, draft.journeySummary].filter(Boolean).join('\n\n'),
+        start_date: request.startDate ?? null,
+        end_date: request.endDate ?? null,
+        currency: request.currency,
+        reminder_days: body.reminderDays,
+        ...(!request.startDate && !request.endDate ? { day_count: request.days } : {}),
+      });
+
+      const tripId = created.tripId;
+      const storedDays = this.days.list(tripId).days;
+      if (storedDays.length !== draft.days.length) {
+        throw new VoyaAiInvalidDraftError(
+          `TREK created ${storedDays.length} days for a ${draft.days.length}-day multi-city draft`,
+        );
+      }
+
+      const firstDayByDestination = new Map<string, number>();
+      draft.days.forEach((day, index) => {
+        const key = canonicalPlaceName(day.destination || '');
+        if (key && !firstDayByDestination.has(key)) firstDayByDestination.set(key, index);
+      });
+
+      for (let index = 0; index < draft.days.length; index++) {
+        const planDay = draft.days[index];
+        const storedDay = storedDays[index];
+        const destination = planDay.destination || request.destinations[0]?.name || '';
+        const leg = draft.legs.find(candidate => canonicalPlaceName(candidate.destination) === canonicalPlaceName(destination));
+        const transferLine = planDay.isTransferDay && leg?.transportFromPrevious
+          ? `Voya transfer suggestion: ${leg.transportFromPrevious}${leg.transferDurationLabel ? ` · ${leg.transferDurationLabel}` : ''}. ${leg.transferNotes || 'Verify current schedule and fare before booking.'}`
+          : '';
+
+        this.days.update(storedDay.id, storedDay, {
+          title: planDay.title,
+          notes: [
+            `Voya city: ${destination}${planDay.country ? `, ${planDay.country}` : ''}.`,
+            planDay.objective,
+            transferLine,
+            planDay.transportNote,
+          ].filter(Boolean).join('\n\n'),
+        });
+
+        for (const activity of planDay.activities) {
+          const suggestionNote = [
+            'Suggested by Voya — verify current details before relying on them.',
+            `Voya destination: ${destination}.`,
+            planDay.isTransferDay ? 'This is part of a Voya transfer day.' : '',
+            activity.notes,
+            activity.reservationRecommended ? 'Reservation may be worth checking.' : '',
+            activity.priceLabel,
+          ].filter(Boolean).join(' ');
+
+          const place = this.places.create(String(tripId), {
+            name: activity.name,
+            description: activity.description,
+            address: activity.addressQuery || activity.area,
+            duration_minutes: activity.durationMin,
+            place_time: activity.startTime,
+            notes: suggestionNote,
+          });
+
+          this.assignments.createAssignment(storedDay.id, place.id, suggestionNote);
+        }
+      }
+
+      const trip = this.trips.get(tripId, user.id);
+      if (!trip) throw new VoyaAiInvalidDraftError('Created multi-city trip could not be reloaded');
+
+      return {
+        trip,
+        days: this.days.list(tripId).days,
+        draft,
+      };
+    });
   }
 
   async planDraft(userId: number, request: VoyaPlanDraftRequest): Promise<VoyaPlanDraftResponse> {
@@ -951,6 +1103,114 @@ export class VoyaAiService {
       if (!valid.has(item.dayId)) throw new VoyaAiInvalidDraftError(`Unknown day id ${item.dayId}`);
       if (seen.has(item.dayId)) throw new VoyaAiInvalidDraftError(`Day ${item.dayId} appears more than once`);
       seen.add(item.dayId);
+    }
+  }
+
+  private normalizeMultiCity(raw: unknown, request: VoyaMultiCityPlanRequest): unknown {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+    const out = structuredClone(raw) as Record<string, unknown>;
+    const days = Array.isArray(out.days) ? out.days : [];
+
+    out.days = days.map((value, index) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+      const day: Record<string, unknown> = { ...(value as Record<string, unknown>), dayNumber: index + 1 };
+      if (request.startDate) day.date = addIsoDays(request.startDate, index);
+      else delete day.date;
+
+      if (Array.isArray(day.activities)) {
+        day.activities = day.activities.map((activity) => {
+          if (!activity || typeof activity !== 'object' || Array.isArray(activity)) return activity;
+          const next: Record<string, unknown> = {
+            ...(activity as Record<string, unknown>),
+            verificationStatus: 'Suggested',
+            priceKnown: false,
+          };
+          delete next.price;
+          return next;
+        });
+      }
+      return day;
+    });
+
+    if (Array.isArray(out.legs)) {
+      out.legs = out.legs.map((leg, index) => {
+        if (!leg || typeof leg !== 'object' || Array.isArray(leg)) return leg;
+        return { ...(leg as Record<string, unknown>), order: index + 1 };
+      });
+    }
+
+    return out;
+  }
+
+  private assertMultiCityQuality(draft: VoyaMultiCityPlanDraft, request: VoyaMultiCityPlanRequest): void {
+    if (draft.days.length !== request.days) {
+      throw new VoyaAiInvalidDraftError(`Expected exactly ${request.days} days but received ${draft.days.length}`);
+    }
+    if (draft.legs.length !== request.destinations.length) {
+      throw new VoyaAiInvalidDraftError(`Expected ${request.destinations.length} destination legs but received ${draft.legs.length}`);
+    }
+
+    const requestedNames = request.destinations.map(destination => canonicalPlaceName(destination.name));
+    const legNames = draft.legs.map(leg => canonicalPlaceName(leg.destination));
+    if (new Set(legNames).size !== legNames.length) {
+      throw new VoyaAiInvalidDraftError('Every multi-city leg must use a distinct destination');
+    }
+    for (const requested of requestedNames) {
+      if (!legNames.includes(requested)) throw new VoyaAiInvalidDraftError('A requested destination is missing from the journey');
+    }
+    if (!request.allowReorder && requestedNames.some((name, index) => legNames[index] !== name)) {
+      throw new VoyaAiInvalidDraftError('Destination order changed even though reordering was disabled');
+    }
+
+    const allocated = draft.legs.reduce((sum, leg) => sum + leg.allocatedDays, 0);
+    if (allocated !== request.days) {
+      throw new VoyaAiInvalidDraftError(`Leg allocation totals ${allocated} days instead of ${request.days}`);
+    }
+
+    const daysByDestination = new Map<string, number>();
+    for (const day of draft.days) {
+      const key = canonicalPlaceName(day.destination || '');
+      if (!legNames.includes(key)) throw new VoyaAiInvalidDraftError(`Day ${day.dayNumber} uses a destination outside the journey`);
+      daysByDestination.set(key, (daysByDestination.get(key) || 0) + 1);
+    }
+    for (const leg of draft.legs) {
+      const key = canonicalPlaceName(leg.destination);
+      if ((daysByDestination.get(key) || 0) !== leg.allocatedDays) {
+        throw new VoyaAiInvalidDraftError(`${leg.destination} was allocated ${leg.allocatedDays} days but the itinerary contains ${daysByDestination.get(key) || 0}`);
+      }
+    }
+
+    let cursor = 0;
+    for (let index = 0; index < draft.legs.length; index++) {
+      const leg = draft.legs[index];
+      const expected = canonicalPlaceName(leg.destination);
+      for (let offset = 0; offset < leg.allocatedDays; offset++) {
+        const day = draft.days[cursor + offset];
+        if (!day || canonicalPlaceName(day.destination || '') !== expected) {
+          throw new VoyaAiInvalidDraftError(`Days for ${leg.destination} must be contiguous in journey order`);
+        }
+        if (offset === 0 && index > 0 && day.isTransferDay !== true) {
+          throw new VoyaAiInvalidDraftError(`The first day in ${leg.destination} must be marked as a transfer day`);
+        }
+      }
+      if (index > 0 && !leg.transportFromPrevious) {
+        throw new VoyaAiInvalidDraftError(`${leg.destination} is missing a transfer mode from the previous city`);
+      }
+      cursor += leg.allocatedDays;
+    }
+
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const day of draft.days) {
+      for (const activity of day.activities) {
+        const key = canonicalPlaceName(activity.name);
+        if (!key || GENERIC_ACTIVITY_NAMES.has(key) || /transfer|train|flight|drive|ferry|bus/.test(key)) continue;
+        if (seen.has(key)) duplicates.add(activity.name);
+        seen.add(key);
+      }
+    }
+    if (duplicates.size) {
+      throw new VoyaAiInvalidDraftError(`Repeated named places across the journey: ${Array.from(duplicates).slice(0, 6).join(', ')}`);
     }
   }
 
