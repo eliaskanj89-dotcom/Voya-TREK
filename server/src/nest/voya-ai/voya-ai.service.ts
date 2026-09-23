@@ -887,6 +887,184 @@ export class VoyaAiService {
     }
   }
 
+  listEditHistory(user: User, request: VoyaEditHistoryRequest): VoyaEditHistoryResult {
+    const trip = this.days.verifyTripAccess(request.tripId, user.id);
+    if (!trip) throw new VoyaAiPermissionError('Trip not found');
+
+    const rows = this.db.all<{
+      id: number;
+      trip_id: number;
+      scope: 'day' | 'trip';
+      label: string;
+      affected_day_ids: string;
+      created_at: string;
+      restored_at: string | null;
+    }>(
+      'SELECT id, trip_id, scope, label, affected_day_ids, created_at, restored_at FROM voya_edit_snapshots WHERE trip_id = ? ORDER BY created_at DESC, id DESC LIMIT 20',
+      request.tripId,
+    );
+
+    return {
+      tripId: request.tripId,
+      snapshots: rows.map(row => ({
+        id: row.id,
+        tripId: row.trip_id,
+        scope: row.scope,
+        label: row.label,
+        affectedDayIds: parseNumberArray(row.affected_day_ids),
+        createdAt: row.created_at,
+        restoredAt: row.restored_at,
+      })),
+    };
+  }
+
+  restoreEditSnapshot(user: User, request: VoyaRestoreEditSnapshotRequest) {
+    const trip = this.days.verifyTripAccess(request.tripId, user.id);
+    if (!trip) throw new VoyaAiPermissionError('Trip not found');
+    if (!this.days.canEdit(trip, user)) throw new VoyaAiPermissionError('No permission to edit this trip');
+
+    const row = this.db.get<{
+      id: number;
+      trip_id: number;
+      scope: 'day' | 'trip';
+      label: string;
+      affected_day_ids: string;
+      snapshot_json: string;
+    }>(
+      'SELECT id, trip_id, scope, label, affected_day_ids, snapshot_json FROM voya_edit_snapshots WHERE id = ? AND trip_id = ?',
+      request.snapshotId,
+      request.tripId,
+    );
+    if (!row) throw new VoyaAiInvalidDraftError('Voya edit snapshot not found');
+
+    const payload = parseEditSnapshotPayload(row.snapshot_json);
+    const affectedDayIds = payload.days.map(entry => Number(entry.day.id)).filter(Number.isFinite);
+    if (!affectedDayIds.length) throw new VoyaAiInvalidDraftError('Snapshot contains no restorable days');
+
+    this.db.transaction(() => {
+      this.createEditSnapshot(
+        user.id,
+        request.tripId,
+        affectedDayIds,
+        row.scope,
+        'Before restore: ' + row.label.slice(0, 120),
+        false,
+      );
+
+      const assignmentColumns = new Set(
+        this.db.all<{ name: string }>("PRAGMA table_info('day_assignments')").map(column => column.name),
+      );
+
+      for (const daySnapshot of payload.days) {
+        const dayId = Number(daySnapshot.day.id);
+        if (!Number.isFinite(dayId)) throw new VoyaAiInvalidDraftError('Snapshot contains an invalid day id');
+        const liveDay = this.days.getDay(dayId, request.tripId);
+        if (!liveDay) throw new VoyaAiInvalidDraftError('Day ' + dayId + ' no longer exists and cannot be restored');
+
+        const current = this.assignments.listDayAssignments(dayId);
+        const preservedProtected = current.filter(assignment => this.assignmentProtectedFromAiEdit(assignment));
+        const preservedIds = new Set(preservedProtected.map(assignment => assignment.id));
+
+        for (const assignment of current) {
+          if (!preservedIds.has(assignment.id)) this.assignments.deleteAssignment(assignment.id);
+        }
+
+        const reinsertedIds = new Set<number>();
+        for (const assignment of daySnapshot.assignments) {
+          const assignmentId = Number(assignment.id);
+          if (!Number.isFinite(assignmentId)) continue;
+
+          if (preservedIds.has(assignmentId)) {
+            if (typeof assignment.order_index === 'number') {
+              this.db.run(
+                'UPDATE day_assignments SET order_index = ? WHERE id = ? AND day_id = ?',
+                assignment.order_index,
+                assignmentId,
+                dayId,
+              );
+            }
+            continue;
+          }
+
+          const values: Record<string, unknown> = { ...assignment, day_id: dayId };
+          const columns = Object.keys(values).filter(column => assignmentColumns.has(column));
+          if (!columns.length) continue;
+          const placeholders = columns.map(() => '?').join(', ');
+          this.db.run(
+            'INSERT INTO day_assignments (' + columns.join(', ') + ') VALUES (' + placeholders + ')',
+            ...columns.map(column => values[column]),
+          );
+          reinsertedIds.add(assignmentId);
+        }
+
+        for (const participant of daySnapshot.participants) {
+          if (!reinsertedIds.has(participant.assignment_id)) continue;
+          this.db.run(
+            'INSERT OR IGNORE INTO assignment_participants (assignment_id, user_id) VALUES (?, ?)',
+            participant.assignment_id,
+            participant.user_id,
+          );
+        }
+        for (const link of daySnapshot.reservationLinks) {
+          if (!reinsertedIds.has(link.assignment_id)) continue;
+          this.db.run(
+            'UPDATE reservations SET assignment_id = ? WHERE id = ? AND trip_id = ?',
+            link.assignment_id,
+            link.reservation_id,
+            request.tripId,
+          );
+        }
+
+        const snapshotIdSet = new Set(daySnapshot.assignments.map(assignment => Number(assignment.id)));
+        const snapshotOrderMax = daySnapshot.assignments.reduce(
+          (max, assignment) => typeof assignment.order_index === 'number' ? Math.max(max, assignment.order_index) : max,
+          -1,
+        );
+        let appendOrder = snapshotOrderMax + 1;
+        for (const assignment of preservedProtected) {
+          if (snapshotIdSet.has(assignment.id)) continue;
+          this.db.run(
+            'UPDATE day_assignments SET order_index = ? WHERE id = ? AND day_id = ?',
+            appendOrder++,
+            assignment.id,
+            dayId,
+          );
+        }
+
+        this.db.run(
+          'UPDATE days SET title = ?, notes = ?, default_transport_mode = ? WHERE id = ? AND trip_id = ?',
+          asNullableString(daySnapshot.day.title),
+          asNullableString(daySnapshot.day.notes),
+          asNullableString(daySnapshot.day.default_transport_mode),
+          dayId,
+          request.tripId,
+        );
+      }
+
+      this.db.run(
+        'UPDATE voya_edit_snapshots SET restored_at = CURRENT_TIMESTAMP WHERE id = ? AND trip_id = ?',
+        request.snapshotId,
+        request.tripId,
+      );
+      this.pruneEditSnapshots(request.tripId, request.snapshotId);
+    });
+
+    for (const dayId of affectedDayIds) {
+      const day = this.days.getDay(dayId, request.tripId);
+      if (!day) continue;
+      const assignments = this.assignments.listDayAssignments(dayId);
+      this.assignments.broadcast(
+        String(request.tripId),
+        'assignment:reordered',
+        { dayId, orderedIds: assignments.map(assignment => assignment.id) },
+        undefined,
+      );
+      this.days.broadcast(String(request.tripId), 'day:updated', { day }, undefined);
+    }
+    this.assignments.reconcile(request.tripId);
+
+    return { tripId: request.tripId, snapshotId: request.snapshotId, restoredDays: affectedDayIds };
+  }
   private createEditSnapshot(
     userId: number,
     tripId: number,
