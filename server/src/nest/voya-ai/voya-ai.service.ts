@@ -764,7 +764,7 @@ export class VoyaAiService {
           JSON.stringify(context),
           'Every current assignmentId must appear exactly once: either as kind="existing" in sequence or in removedAssignmentIds.',
           'Never invent an assignmentId.',
-          'Any assignment marked protected=true MUST stay in sequence and MUST NOT appear in removedAssignmentIds.',
+          'Any assignment marked protected=true MUST stay in sequence, MUST NOT appear in removedAssignmentIds, and MUST keep its current time and notes unchanged.',
           'Removing means removing it from this day only. The place remains saved in the trip.',
           'For a new place, use kind="new" and provide an activity. New activities are suggestions only: verificationStatus="Suggested", priceKnown=false, and omit numeric price.',
           'Keep the day geographically coherent and realistic. Avoid unnecessary churn: preserve good existing stops when the instruction does not require replacing them.',
@@ -1376,7 +1376,24 @@ export class VoyaAiService {
     }
     for (const id of protectedIds) {
       if (!sequenceIds.includes(id)) {
-        throw new VoyaAiInvalidDraftError(`Protected hotel-linked assignment ${id} must stay on the day`);
+        throw new VoyaAiInvalidDraftError(`Protected booked assignment ${id} must stay on the day`);
+      }
+      const currentAssignment = current.find(a => a.id === id);
+      const proposed = draft.sequence.find(
+        item => item.kind === 'existing' && item.assignmentId === id,
+      );
+      if (!currentAssignment || !proposed || proposed.kind !== 'existing') continue;
+      const currentStart = currentAssignment.place?.place_time ?? null;
+      const currentEnd = currentAssignment.place?.end_time ?? null;
+      const currentNotes = currentAssignment.notes ?? null;
+      if (
+        (proposed.startTime !== undefined && proposed.startTime !== currentStart) ||
+        (proposed.endTime !== undefined && proposed.endTime !== currentEnd) ||
+        (proposed.notes !== undefined && proposed.notes !== currentNotes)
+      ) {
+        throw new VoyaAiInvalidDraftError(
+          `Protected booked assignment ${id} cannot have its time or notes changed by Voya`,
+        );
       }
     }
 
