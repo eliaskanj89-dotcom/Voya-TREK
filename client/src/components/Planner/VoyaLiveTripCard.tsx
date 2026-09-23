@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Clock, Hotel, MapPin, Navigation, TimerReset } from 'lucide-react'
-import type { Accommodation, Assignment, AssignmentsMap, Day } from '../../types'
+import type { Accommodation, Assignment, AssignmentsMap, Day, Reservation } from '../../types'
 import { assignmentsApi } from '../../api/client'
 import { useToast } from '../shared/Toast'
 import { useTripStore } from '../../store/tripStore'
@@ -13,6 +13,7 @@ interface VoyaLiveTripCardProps {
   days: Day[]
   assignments: AssignmentsMap
   accommodations: Accommodation[]
+  reservations: Reservation[]
   selectedDayId: number | null
   onOpenToday?: (dayId: number) => void
   onRouteRefresh?: () => void
@@ -45,6 +46,7 @@ export default function VoyaLiveTripCard({
   days,
   assignments,
   accommodations,
+  reservations,
   selectedDayId,
   onOpenToday,
   onRouteRefresh,
@@ -78,6 +80,23 @@ export default function VoyaLiveTripCard({
     () => todayDay ? getDayBookendHotels(todayDay, days, accommodations) : {},
     [todayDay, days, accommodations],
   )
+
+  const transportToday = useMemo(() => {
+    if (todayDayId == null) return null
+    const candidates = reservations
+      .filter(reservation => {
+        if (reservation.accommodation_id != null) return false
+        if (reservation.day_id !== todayDayId && reservation.end_day_id !== todayDayId) return false
+        const kind = String(reservation.type || '').toLowerCase()
+        return !!reservation.endpoints?.length || /(flight|train|rail|bus|ferry|transport|transfer)/.test(kind)
+      })
+      .map(reservation => ({
+        reservation,
+        start: parseTime(reservation.reservation_time),
+      }))
+      .sort((a, b) => (a.start ?? 9999) - (b.start ?? 9999))
+    return candidates.find(row => row.start == null || row.start >= nowMinutes) ?? candidates[0] ?? null
+  }, [todayDayId, reservations, nowMinutes])
   const morning = bookends.morning
   const evening = bookends.evening
   const stayChanged = morning && evening && morning.id !== evening.id
@@ -123,6 +142,12 @@ export default function VoyaLiveTripCard({
     morning?.end_day_id === todayDay.id && morning.check_out ? `Check out ${morning.check_out.slice(0, 5)}` : '',
     evening?.start_day_id === todayDay.id && evening.check_in ? `Check in ${evening.check_in.slice(0, 5)}` : '',
   ].filter(Boolean).join(' · ')
+  const transportEndpoints = transportToday?.reservation.endpoints
+    ?.filter(endpoint => endpoint.role === 'from' || endpoint.role === 'to')
+    .sort((a, b) => a.sequence - b.sequence)
+    .map(endpoint => endpoint.name)
+    .filter(Boolean)
+  const transportTime = transportToday?.reservation.reservation_time?.slice(0, 5) || ''
 
   return (
     <section className={`voya-live-card ${compact ? 'voya-live-card-compact' : ''} rounded-[22px] border border-[#B9D5FA]/35 bg-[linear-gradient(145deg,rgba(10,32,60,.97),rgba(7,23,44,.95))] p-4 text-white shadow-[0_18px_46px_rgba(12,43,82,.22)]`}>
@@ -148,7 +173,7 @@ export default function VoyaLiveTripCard({
         )}
       </div>
 
-      <div className={`mt-3 grid gap-2.5 ${compact ? 'grid-cols-1' : 'sm:grid-cols-2'}`}>
+      <div className={`mt-3 grid gap-2.5 ${compact ? 'grid-cols-1' : transportToday ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <div className="rounded-[16px] border border-white/8 bg-white/7 px-3.5 py-3">
           <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.11em] text-white/42">
             <Clock size={12} /> Up next
@@ -178,6 +203,18 @@ export default function VoyaLiveTripCard({
             {stayTiming || evening?.place_address || morning?.place_address || 'Add a stay to make Voya base-aware.'}
           </div>
         </div>
+
+        {transportToday && (
+          <div className="rounded-[16px] border border-white/8 bg-white/7 px-3.5 py-3">
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.11em] text-white/42">
+              <Navigation size={12} /> Booked transport
+            </div>
+            <div className="mt-1.5 truncate text-[13px] font-semibold text-white">{transportToday.reservation.title}</div>
+            <div className="mt-1 text-[11px] text-white/52">
+              {[transportTime, transportEndpoints?.length ? transportEndpoints.join(' → ') : transportToday.reservation.location].filter(Boolean).join(' · ') || 'Check reservation details'}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
