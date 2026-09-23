@@ -87,8 +87,24 @@ export default function MLlmConnectionSection(): React.ReactElement {
   }
 
   return (
-    <MSetCard title={t('settings.aiParsing.title')} icon={Sparkles} className="mt-3">
-      <MSetHint className="mb-3">{t('settings.aiParsing.hint')}</MSetHint>
+    <MSetCard title="Voya AI" icon={Sparkles} className="mt-3">
+      <div className="mb-3 rounded-[18px] border border-[color:var(--m-rowbr)] bg-[color:var(--m-inner)] p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="font-geist text-[0.625rem] font-bold uppercase tracking-[.12em] text-[#377CF6]">Voya intelligence</div>
+            <p className="mt-1 font-geist text-[0.65625rem] leading-relaxed text-m-muted">
+              Powers trip planning, Ask Voya edits, Before You Go and AI document parsing.
+            </p>
+          </div>
+          <span className={`flex-none rounded-full px-2 py-1 font-geist text-[0.5625rem] font-bold ${
+            hasStoredKey && model.trim()
+              ? 'bg-[#198754]/10 text-[#198754]'
+              : 'bg-[#F59E0B]/10 text-[#A16207] dark:text-[#FBBF24]'
+          }`}>
+            {hasStoredKey && model.trim() ? 'Ready' : 'Setup'}
+          </span>
+        </div>
+      </div>
 
       <MSetEyebrow className="mb-[5px]">{t('settings.aiParsing.provider')}</MSetEyebrow>
       <MSetSelectRow
@@ -104,7 +120,7 @@ export default function MLlmConnectionSection(): React.ReactElement {
         autoComplete="off"
         value={model}
         onChange={e => setModel(e.target.value)}
-        placeholder="qwen3:8b"
+        placeholder={provider === 'anthropic' ? 'claude-3-5-haiku-latest' : 'gpt-4o-mini'}
       />
 
       {/* Both remaining providers are hosted and need a key, so this is no longer
