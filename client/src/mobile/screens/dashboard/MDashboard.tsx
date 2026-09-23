@@ -242,6 +242,9 @@ export default function MDashboard(): React.ReactElement {
           </span>
         </button>
         <div className="min-w-0 flex-1" />
+        <MIconBtn ariaLabel="Discover destinations" onClick={() => navigate('/discover')}>
+          <Compass size={18} strokeWidth={2} />
+        </MIconBtn>
         <MIconBtn ariaLabel={t('notifications.title')} onClick={() => navigate('/notifications')}>
           <Bell size={18} strokeWidth={2} />
           {unread > 0 && (
