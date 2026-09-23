@@ -14,11 +14,14 @@ import {
   type VoyaGeneratedReadinessItem,
   type VoyaDestinationDiscoveryRequest,
   type VoyaDestinationDiscoveryResult,
+  type VoyaDestinationResolveRequest,
+  type VoyaDestinationResolveResult,
   type VoyaReadinessBuildRequest,
   type VoyaReadinessResult,
   type VoyaReadinessStatusRequest,
   voyaGeneratedReadinessItemSchema,
   voyaDestinationDiscoveryResultSchema,
+  voyaDestinationResolveResultSchema,
   voyaDayEditDraftSchema,
   voyaPlanDraftResponseSchema,
   voyaTravelerDnaSchema,
@@ -43,6 +46,7 @@ const generatedReadinessSchema = z.object({
   items: z.array(voyaGeneratedReadinessItemSchema).max(12),
 });
 const generatedDestinationDiscoverySchema = voyaDestinationDiscoveryResultSchema.omit({ generatedBy: true });
+const generatedDestinationResolveSchema = voyaDestinationResolveResultSchema.omit({ generatedBy: true });
 
 export class VoyaAiUnavailableError extends Error {
   constructor() {
@@ -78,6 +82,56 @@ export class VoyaAiService {
     private readonly maps: MapsService,
     private readonly settings: SettingsService,
   ) {}
+
+  async resolveDestination(
+    user: User,
+    request: VoyaDestinationResolveRequest,
+  ): Promise<VoyaDestinationResolveResult> {
+    const config = this.configResolver.resolve(user.id);
+    if (!config) throw new VoyaAiUnavailableError();
+
+    let repair = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const raw = await this.generator.generate(config, {
+        system: DESTINATION_RESOLVER_SYSTEM_PROMPT,
+        user: [
+          `Traveler typed: "${request.query}".`,
+          'Return 1-6 plausible geographic interpretations, most likely first.',
+          'If the term is ambiguous, include the materially different real places a traveler could mean.',
+          'Use canonical destination names and country names.',
+          'Allowed destination types are city, country, island, region, town, state, province, or other geographic area.',
+          'Never return a hotel, airport, train station, restaurant, attraction, company, neighborhood venue, or fictional place.',
+          'disambiguation should concisely explain the distinction only when useful, e.g. "country in the Caucasus" vs "U.S. state".',
+          'subtitle should give short geographic context, not marketing copy.',
+          'searchTerm should be an unambiguous canonical string suitable for itinerary generation.',
+          repair ? `Previous result failed validation. Fix: ${repair}` : '',
+        ].filter(Boolean).join('\n'),
+        jsonSchema: z.toJSONSchema(generatedDestinationResolveSchema),
+      });
+
+      try {
+        const parsed = generatedDestinationResolveSchema.parse(raw);
+        const seen = new Set<string>();
+        for (const suggestion of parsed.suggestions) {
+          const key = `${canonicalPlaceName(suggestion.name)}|${canonicalPlaceName(suggestion.country)}|${canonicalPlaceName(suggestion.region || '')}`;
+          if (seen.has(key)) throw new VoyaAiInvalidDraftError(`Duplicate destination interpretation: ${suggestion.searchTerm}`);
+          seen.add(key);
+        }
+        return {
+          ...parsed,
+          generatedBy: { provider: config.provider, model: config.model },
+        };
+      } catch (error) {
+        if (attempt === 1) {
+          const detail = error instanceof Error ? error.message : 'unknown validation error';
+          throw new VoyaAiInvalidDraftError(`Voya could not resolve this destination safely: ${detail}`);
+        }
+        repair = this.validationMessage(error);
+      }
+    }
+
+    throw new VoyaAiInvalidDraftError('Voya could not resolve this destination');
+  }
 
   async discoverDestinations(
     user: User,
@@ -1228,3 +1282,12 @@ Be inspiring but factual. This is not a live-search call.
 Never invent current prices, visa or entry rules, live safety claims, current events, opening hours, live weather, flight duration, or availability.
 Use qualitative budget and climate language only.
 Return only the requested structured discovery result.`;
+
+
+const DESTINATION_RESOLVER_SYSTEM_PROMPT = `You are Voya's geographic destination resolver.
+Interpret short traveler-entered destination text conservatively.
+Return only real geographic travel destinations that you are confident exist.
+When a name is ambiguous, surface distinct interpretations instead of silently choosing one.
+Do not return businesses, hotels, airports, transit stations, attractions, or fictional places.
+Do not add live facts, prices, safety claims, visa information, or travel availability.
+Return only the requested structured result.`;
