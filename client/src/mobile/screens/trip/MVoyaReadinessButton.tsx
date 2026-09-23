@@ -16,15 +16,26 @@ export default function MVoyaReadinessButton({
 
   useEffect(() => {
     let alive = true
-    voyaAiApi.readiness({ tripId })
-      .then(result => {
-        if (!alive) return
-        setScore(result.score)
-        setStale(result.stale)
-        setGenerated(result.fingerprint != null)
-      })
-      .catch(() => {})
-    return () => { alive = false }
+    const load = () => {
+      voyaAiApi.readiness({ tripId })
+        .then(result => {
+          if (!alive) return
+          setScore(result.score)
+          setStale(result.stale)
+          setGenerated(result.fingerprint != null)
+        })
+        .catch(() => {})
+    }
+    const onUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ tripId?: number }>).detail
+      if (detail?.tripId == null || detail.tripId === tripId) load()
+    }
+    load()
+    window.addEventListener('voya:readiness-updated', onUpdated)
+    return () => {
+      alive = false
+      window.removeEventListener('voya:readiness-updated', onUpdated)
+    }
   }, [tripId])
 
   return (
