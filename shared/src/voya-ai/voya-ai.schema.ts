@@ -70,3 +70,10 @@ export const voyaPlanDraftResponseSchema = z.object({
   }),
 });
 export type VoyaPlanDraftResponse = z.infer<typeof voyaPlanDraftResponseSchema>;
+
+export const voyaMaterializeDraftRequestSchema = z.object({
+  request: voyaPlanDraftRequestSchema,
+  draft: voyaPlanDraftResponseSchema,
+  reminderDays: z.number().int().min(0).max(30).optional().default(0),
+});
+export type VoyaMaterializeDraftRequest = z.infer<typeof voyaMaterializeDraftRequestSchema>;
