@@ -3,7 +3,7 @@ import type { User } from '../../types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StructuredGenerationError } from './structured-generation.service';
-import { VoyaApplyDayEditDto, VoyaDayEditDto, VoyaMaterializeDraftDto, VoyaPlanDraftDto, VoyaVerifyTripDto } from './voya-ai.dto';
+import { VoyaApplyDayEditDto, VoyaDayEditDto, VoyaMaterializeDraftDto, VoyaPlanDraftDto, VoyaTripEditDto, VoyaVerifyTripDto } from './voya-ai.dto';
 import {
   VoyaAiInvalidDraftError,
   VoyaAiPermissionError,
@@ -29,6 +29,28 @@ export class VoyaAiController {
       }
       console.error('Voya AI materialization failed:', error instanceof Error ? error.message : 'unknown error');
       throw new HttpException({ error: 'Voya could not create this trip', code: 'VOYA_AI_MATERIALIZE_ERROR' }, 500);
+    }
+  }
+
+  @Post('trip-edit-plan')
+  async tripEditPlan(@CurrentUser() user: User, @Body() body: VoyaTripEditDto) {
+    try {
+      return { plan: await this.voya.planTripEdit(user, body) };
+    } catch (error) {
+      if (error instanceof VoyaAiUnavailableError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_NOT_CONFIGURED' }, 409);
+      }
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_INVALID_TRIP_EDIT' }, 502);
+      }
+      if (error instanceof StructuredGenerationError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_PROVIDER_ERROR' }, 502);
+      }
+      console.error('Voya trip edit plan failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not plan this trip edit right now', code: 'VOYA_AI_TRIP_EDIT_ERROR' }, 500);
     }
   }
 
