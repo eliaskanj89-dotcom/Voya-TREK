@@ -75,6 +75,7 @@ import { IdempotencyInterceptor } from './common/idempotency.interceptor';
 import { SessionRenewalInterceptor } from './auth/session-renewal.interceptor';
 import { IdempotencyCleanupJob } from './common/idempotency-cleanup.job';
 import { RealtimeGatewayModule } from './realtime/realtime-gateway.module';
+import { VoyaAiModule } from './voya-ai/voya-ai.module';
 
 /**
  * Root NestJS module for the incremental migration. Domain modules
@@ -82,7 +83,7 @@ import { RealtimeGatewayModule } from './realtime/realtime-gateway.module';
  * migrated.
  */
 @Module({
-  imports: [AppConfigModule, DatabaseModule, RealtimeModule, RealtimeGatewayModule, SchedulingModule, McpModule.forRoot({ accessPolicy: trekMcpAccessPolicy, validateAccess: trekMcpValidateAccess }), HealthModule, PlatformModule, McpTransportModule, WeatherModule, PublicApiModule, HelpModule, AirportsModule, ConfigModule, SystemNoticesModule, GeoModule, MapsModule, PlaceEnrichmentModule, PlaceShadowModule, RouteUsageModule, CategoriesModule, TagsModule, NotificationsModule, AtlasModule, VacayModule, SchoolHolidaysModule, PackingModule, TodoModule, BudgetModule, ReservationsModule, DaysModule, DayNotesModule, AccommodationsModule, AssignmentsModule, PlacesModule, RoadtripModule, TripsModule, CollabModule, FilesModule, DocSyncModule, PhotosModule, MemoriesModule, AirtrailModule, DawarichModule, JourneyModule, CollectionsModule, ShareModule, TripInviteModule, TransitModule, FeedsModule, SettingsModule, StorageModule, BackupModule, AuthModule, OidcModule, OauthModule, AdminModule, AddonsModule, AuditModule, PermissionsModule, PluginsModule, BookingImportModule, ReservationImportModule, LlmParseModule, ManagedExtModule],
+  imports: [AppConfigModule, DatabaseModule, RealtimeModule, RealtimeGatewayModule, SchedulingModule, McpModule.forRoot({ accessPolicy: trekMcpAccessPolicy, validateAccess: trekMcpValidateAccess }), HealthModule, PlatformModule, McpTransportModule, WeatherModule, PublicApiModule, HelpModule, AirportsModule, ConfigModule, SystemNoticesModule, GeoModule, MapsModule, PlaceEnrichmentModule, PlaceShadowModule, RouteUsageModule, CategoriesModule, TagsModule, NotificationsModule, AtlasModule, VacayModule, SchoolHolidaysModule, PackingModule, TodoModule, BudgetModule, ReservationsModule, DaysModule, DayNotesModule, AccommodationsModule, AssignmentsModule, PlacesModule, RoadtripModule, TripsModule, CollabModule, FilesModule, DocSyncModule, PhotosModule, MemoriesModule, AirtrailModule, DawarichModule, JourneyModule, CollectionsModule, ShareModule, TripInviteModule, TransitModule, FeedsModule, SettingsModule, StorageModule, BackupModule, AuthModule, OidcModule, OauthModule, AdminModule, AddonsModule, AuditModule, PermissionsModule, PluginsModule, BookingImportModule, ReservationImportModule, LlmParseModule, VoyaAiModule, ManagedExtModule],
   providers: [
     // Default-deny: a route is authenticated unless it carries @Public() or
     // @OptionalAuth(), or declares its own @UseGuards chain. Protection used to
