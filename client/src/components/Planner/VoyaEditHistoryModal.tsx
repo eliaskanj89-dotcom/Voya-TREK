@@ -97,7 +97,7 @@ export default function VoyaEditHistoryModal({
           <div>
             <div className="text-body font-semibold text-content">AI edits are reversible</div>
             <p className="mt-1 text-caption leading-relaxed text-content-muted">
-              Voya saves a version immediately before each AI day edit or whole-trip edit. Restoring affects only those itinerary days. Protected bookings added later are kept, and Voya creates another snapshot before the restore so you can undo the restore too.
+              Voya saves a version immediately before each AI day edit or whole-trip edit. Restoring affects only those itinerary days. If those days changed afterward, Voya blocks the restore rather than overwriting newer work. A new snapshot is created before every successful restore.
             </p>
           </div>
         </div>
@@ -178,7 +178,7 @@ export default function VoyaEditHistoryModal({
                 {confirming && (
                   <div className="border-t border-edge-faint bg-surface-tertiary px-4 py-3.5">
                     <p className="text-caption leading-relaxed text-content-muted">
-                      Restore this itinerary version? Voya will save the current state first. Booked or hotel-linked stops that were added after this snapshot are protected and will not be removed.
+                      Restore this itinerary version? Voya will save the current state first. If the affected days changed after this Voya edit, restore will stop with a conflict instead of overwriting the newer itinerary.
                     </p>
                     <div className="mt-3 flex justify-end gap-2">
                       <button
