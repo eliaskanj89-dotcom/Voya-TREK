@@ -1,0 +1,72 @@
+name: Voya release gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: voya-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build workspaces
+        run: npm run build
+
+      - name: Lint workspaces
+        run: npm run lint
+
+      - name: Voya safety invariants
+        run: npm run test --workspace=server -- tests/unit/nest/voya-ai-multicity.test.ts tests/unit/nest/voya-ai-trip-edit.test.ts tests/unit/nest/voya-ai-history.test.ts tests/unit/nest/voya-ai-readiness-todo.test.ts
+
+      - name: Build production Voya image
+        run: docker build -t voya-release:${{ github.sha }} .
+
+      - name: Boot production Voya container
+        run: |
+          docker run -d             --name voya-release-test             -p 3000:3000             -e NODE_ENV=production             -e PORT=3000             -e ALLOWED_ORIGINS=http://127.0.0.1:3000             -e APP_URL=http://127.0.0.1:3000             -e FORCE_HTTPS=false             -e COOKIE_SECURE=false             voya-release:${{ github.sha }}
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/api/health > /tmp/voya-health.json; then
+              cat /tmp/voya-health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs voya-release-test
+          exit 1
+
+      - name: Smoke public shell
+        run: |
+          curl -fsS http://127.0.0.1:3000/ | grep -qi 'Voya'
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs voya-release-test || true
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f voya-release-test || true
