@@ -1709,3 +1709,88 @@ button, a, [role="button"] {
 @media (prefers-reduced-motion: reduce) {
   .voya-glass { backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
 }
+
+
+/* ── Voya trip workspace ───────────────────────────────────────────────── */
+.voya-planner {
+  background: #EAF2FC;
+}
+.dark .voya-planner { background: #07111F; }
+
+.voya-planner-tabs {
+  top: calc(var(--nav-h) + 10px) !important;
+  left: 50% !important;
+  right: auto !important;
+  width: auto;
+  max-width: calc(100vw - 420px);
+  transform: translateX(-50%);
+  height: 46px !important;
+  padding: 4px 7px !important;
+  border: 1px solid rgba(255,255,255,.90) !important;
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255,255,255,.88), rgba(237,246,255,.76)) !important;
+  box-shadow: 0 16px 42px rgba(31,67,112,.12), inset 0 1px 0 rgba(255,255,255,.98);
+  backdrop-filter: blur(28px) saturate(165%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(165%) !important;
+}
+.dark .voya-planner-tabs {
+  background: linear-gradient(145deg, rgba(15,34,58,.90), rgba(8,22,39,.82)) !important;
+  border-color: rgba(255,255,255,.09) !important;
+  box-shadow: 0 18px 45px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.voya-planner-stage {
+  top: calc(var(--nav-h) + 66px) !important;
+  border-radius: 30px 30px 0 0;
+  overflow: hidden !important;
+  box-shadow: 0 -1px 0 rgba(113,150,194,.10);
+}
+
+.voya-planner-left > div:last-child,
+.voya-planner-right > div:last-child {
+  border: 1px solid rgba(255,255,255,.92);
+  box-shadow: 0 22px 60px rgba(31,67,112,.14), inset 0 1px 0 rgba(255,255,255,.97) !important;
+  background: linear-gradient(145deg, rgba(255,255,255,.86), rgba(237,246,255,.72)) !important;
+  backdrop-filter: blur(30px) saturate(165%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(165%) !important;
+}
+.dark .voya-planner-left > div:last-child,
+.dark .voya-planner-right > div:last-child {
+  background: linear-gradient(145deg, rgba(14,31,53,.91), rgba(8,22,39,.78)) !important;
+  border-color: rgba(255,255,255,.09);
+  box-shadow: 0 24px 66px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.06) !important;
+}
+
+.voya-planner-left button,
+.voya-planner-right button {
+  transition: transform .22s cubic-bezier(.16,1,.3,1), background .2s ease, color .2s ease, opacity .2s ease;
+}
+
+.voya-planner-left [class*="rounded"],
+.voya-planner-right [class*="rounded"] {
+  border-color: rgba(112,145,184,.13);
+}
+
+.voya-planner .leaflet-control,
+.voya-planner .maplibregl-ctrl-group,
+.voya-planner .mapboxgl-ctrl-group {
+  border-radius: 16px !important;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(31,67,112,.14) !important;
+}
+
+.voya-planner .leaflet-bar a,
+.voya-planner .maplibregl-ctrl-group button,
+.voya-planner .mapboxgl-ctrl-group button {
+  background-color: rgba(248,251,255,.90) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.voya-planner [class*="bg-accent"] {
+  background-color: #377CF6 !important;
+}
+
+@media (max-width: 1100px) {
+  .voya-planner-tabs { max-width: calc(100vw - 160px); }
+}
