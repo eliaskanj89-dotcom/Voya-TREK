@@ -2,26 +2,31 @@ import { voyaAiApi } from '../api/client'
 import { getApiErrorMessage } from '../types'
 import { useBackgroundTasksStore } from '../store/backgroundTasksStore'
 
+interface RunOptions {
+  taskId?: string
+  announce?: boolean
+}
+
 /**
  * Runs the post-create trust pipeline for Voya-generated trips.
  *
- * Order matters:
- * 1) verify provider identities / coordinates and optimize verified route order;
- * 2) best-effort refresh Before You Go from the now-current itinerary;
- * 3) compute deterministic Trip Health after enrichment.
- *
- * Readiness generation depends on the user's configured LLM and is intentionally
- * non-fatal. Place verification remains the core required enrichment step.
+ * The operations are deliberately repeatable: provider verification skips
+ * already-identified places, route optimization is stable, readiness is rebuilt
+ * from the current fingerprint, and Trip Health is read-only. That makes it safe
+ * to resume a task after a hard reload.
  */
-export function startVoyaEnrichment(tripId: number): void {
-  const id = `voya-enrich-${tripId}-${Date.now()}`
+function runVoyaEnrichment(tripId: number, options: RunOptions = {}): void {
+  const id = options.taskId ?? `voya-enrich-${tripId}-${Date.now()}`
+  const announce = options.announce !== false
   const store = useBackgroundTasksStore.getState()
 
-  store.addVoyaTask({
-    id,
-    tripId: String(tripId),
-    label: 'Voya is verifying places, optimizing routes and checking readiness',
-  })
+  if (announce) {
+    store.addVoyaTask({
+      id,
+      tripId: String(tripId),
+      label: 'Voya is verifying places, optimizing routes and checking readiness',
+    })
+  }
 
   void (async () => {
     const verification = await voyaAiApi.verifyTrip({ tripId })
@@ -76,4 +81,12 @@ export function startVoyaEnrichment(tripId: number): void {
       getApiErrorMessage(error, 'Voya could not finish place verification. You can retry from Places.'),
     )
   })
+}
+
+export function startVoyaEnrichment(tripId: number): void {
+  runVoyaEnrichment(tripId)
+}
+
+export function resumeVoyaEnrichment(taskId: string, tripId: number): void {
+  runVoyaEnrichment(tripId, { taskId, announce: false })
 }
