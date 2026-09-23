@@ -25,6 +25,7 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
   const [data, setData] = useState<VoyaTripHealthResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [repairingId, setRepairingId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const load = async (silent = false) => {
@@ -45,6 +46,49 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
   useEffect(() => {
     void load()
   }, [tripId])
+
+  const repairIssue = async (issue: VoyaTripHealthIssue) => {
+    if (repairingId) return
+    setRepairingId(issue.id)
+    setError('')
+    try {
+      if (issue.category === 'Verification') {
+        await voyaAiApi.verifyTrip({ tripId })
+        window.dispatchEvent(new CustomEvent('voya:places-verified', { detail: { tripId } }))
+        await load(true)
+        return
+      }
+
+      if ((issue.category === 'Schedule' || issue.category === 'Route') && issue.dayId) {
+        const instruction =
+          issue.category === 'Route'
+            ? 'Optimize this day to reduce unnecessary backtracking while preserving timed, booked and important stops.'
+            : issue.id.startsWith('overloaded-day-')
+              ? 'Make this day realistically paced. Keep the most important stops, reduce overload, preserve booked or timed items, and leave normal travel and meal buffers.'
+              : 'Fix the timing conflicts in this day while preserving booked or timed commitments and keeping the day realistic.'
+        window.dispatchEvent(new CustomEvent('voya:trip-health-repair', {
+          detail: { tripId, dayId: issue.dayId, category: issue.category, instruction },
+        }))
+        setOpen(false)
+        return
+      }
+
+      if (issue.category === 'Readiness') {
+        window.dispatchEvent(new CustomEvent('voya:open-readiness', { detail: { tripId } }))
+        setOpen(false)
+        return
+      }
+
+      if (issue.category === 'Reservation') {
+        window.dispatchEvent(new CustomEvent('voya:open-reservations', { detail: { tripId, dayId: issue.dayId ?? null } }))
+        setOpen(false)
+      }
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Voya could not repair this issue right now.'))
+    } finally {
+      setRepairingId(null)
+    }
+  }
 
   const highIssues = useMemo(
     () => data?.issues.filter(issue => issue.severity === 'High').length ?? 0,
@@ -176,7 +220,14 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
               </div>
             ) : (
               <div className="mt-5 space-y-2.5">
-                {data.issues.map(issue => <HealthIssueRow key={issue.id} issue={issue} />)}
+                {data.issues.map(issue => (
+                  <HealthIssueRow
+                    key={issue.id}
+                    issue={issue}
+                    busy={repairingId === issue.id}
+                    onRepair={() => { void repairIssue(issue) }}
+                  />
+                ))}
               </div>
             )}
 
@@ -231,7 +282,15 @@ function Metric({ label, value }: { label: string; value: string | number }) {
   )
 }
 
-function HealthIssueRow({ issue }: { issue: VoyaTripHealthIssue }) {
+function HealthIssueRow({
+  issue,
+  busy,
+  onRepair,
+}: {
+  issue: VoyaTripHealthIssue
+  busy: boolean
+  onRepair: () => void
+}) {
   const severityClass =
     issue.severity === 'High'
       ? 'bg-[#EF4444]/10 text-[#DC2626]'
@@ -250,7 +309,17 @@ function HealthIssueRow({ issue }: { issue: VoyaTripHealthIssue }) {
             <span className="text-[9px] font-semibold text-content-faint">−{issue.deduction}</span>
           </div>
           <p className="mt-1 text-caption leading-relaxed text-content-muted">{issue.reason}</p>
-          {issue.actionLabel && <p className="mt-1.5 text-[10px] font-semibold text-[#377CF6]">{issue.actionLabel}</p>}
+          {issue.actionLabel && (
+            <button
+              type="button"
+              onClick={onRepair}
+              disabled={busy}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#377CF6]/15 bg-[#377CF6]/6 px-2.5 py-1 text-[10px] font-semibold text-[#377CF6] hover:bg-[#377CF6]/10 disabled:opacity-60"
+            >
+              {busy && <RefreshCw size={10} className="animate-spin" />}
+              {busy ? 'Working…' : issue.actionLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>
