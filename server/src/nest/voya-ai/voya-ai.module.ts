@@ -12,9 +12,10 @@ import { TransitModule } from '../transit/transit.module';
 import { RoadtripModule } from '../roadtrip/roadtrip.module';
 import { SettingsModule } from '../settings/settings.module';
 import { TodoModule } from '../todo/todo.module';
+import { AccommodationsDomainModule } from '../accommodations/accommodations-domain.module';
 
 @Module({
-  imports: [LlmParseModule, TripsModule, DaysModule, PlacesModule, AssignmentsDomainModule, MapsModule, SettingsModule, TransitModule, RoadtripModule, TodoModule],
+  imports: [LlmParseModule, TripsModule, DaysModule, PlacesModule, AssignmentsDomainModule, MapsModule, SettingsModule, TransitModule, RoadtripModule, TodoModule, AccommodationsDomainModule],
   controllers: [VoyaAiController],
   providers: [StructuredGenerationService, VoyaAiService],
   exports: [VoyaAiService],
