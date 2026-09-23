@@ -63,6 +63,7 @@ import { TransitTitle, TransitLegChips, TransitItineraryInline } from './transit
 import { DayPlanSidebarFooter } from './DayPlanSidebarFooter'
 import type { Trip, Day, Place, Category, Assignment, Accommodation, Reservation, AssignmentsMap, RouteResult, RouteSegment, DayNote } from '../../types'
 import { getNavigationTargets, openNavigationTarget } from './placeNavigation'
+import { isVoyaSuggestion } from '../../utils/voyaTrust'
 
 interface DayPlanSidebarProps {
   tripId: number
@@ -1090,6 +1091,13 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     return formatMoneySum(entries, costBase, locale, fxRates)
   }, [days, assignments, currency, costBase, locale, fxRates])
 
+  const unpricedVoyaSuggestionCount = useMemo(
+    () => days.reduce((count, d) => count + (assignments[String(d.id)] || []).filter(a =>
+      !!a.place && a.place.price == null && isVoyaSuggestion(a.place)
+    ).length, 0),
+    [days, assignments],
+  )
+
   return {
     tripId,
     trip,
@@ -1229,6 +1237,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     handleOptimize,
     handleDropOnDay,
     totalCostLabel,
+    unpricedVoyaSuggestionCount,
     expandedRouteDayIds,
     setExpandedRouteDayIds,
   }
@@ -1434,6 +1443,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
     handleOptimize,
     handleDropOnDay,
     totalCostLabel,
+    unpricedVoyaSuggestionCount,
     expandedRouteDayIds,
     setExpandedRouteDayIds,
   } = S
@@ -2294,6 +2304,19 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                                     {formatTime(place.place_time, locale, timeFormat)}{place.end_time ? ` – ${formatTime(place.end_time, locale, timeFormat)}` : ''}
                                   </span>
                                 )}
+                                {place.price == null && isVoyaSuggestion(place) && (
+                                  <span
+                                    title="Voya did not verify a current price for this stop."
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', flexShrink: 0,
+                                      padding: '2px 6px', borderRadius: 999, marginLeft: 4,
+                                      fontSize: 'calc(8.5px * var(--fs-scale-caption, 1))', fontWeight: 700,
+                                      color: '#A16207', background: 'rgba(245,158,11,.10)',
+                                    }}
+                                  >
+                                    Price unverified
+                                  </span>
+                                )}
                               </div>
                               {(place.description || place.address || cat?.name) && (
                                 <div className="collab-note-md" style={{ marginTop: 2, fontSize: 'calc(10px * var(--fs-scale-caption, 1))', color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2, maxHeight: '1.2em' }}>
@@ -3091,7 +3114,11 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
       />
 
       {/* Budget-Fußzeile */}
-      <DayPlanSidebarFooter totalCostLabel={totalCostLabel} t={t} />
+      <DayPlanSidebarFooter
+        totalCostLabel={totalCostLabel}
+        unpricedVoyaSuggestionCount={unpricedVoyaSuggestionCount}
+        t={t}
+      />
       <ContextMenu menu={ctxMenu.menu} onClose={ctxMenu.close} />
     </div>
       <VoyaTripEditModal
