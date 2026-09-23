@@ -30,3 +30,5 @@ export class VoyaApplyTripEditDto extends createZodDto(voyaApplyTripEditRequestS
 export class VoyaEditHistoryDto extends createZodDto(voyaEditHistoryRequestSchema) {}
 
 export class VoyaRestoreEditSnapshotDto extends createZodDto(voyaRestoreEditSnapshotRequestSchema) {}
+
+export class VoyaTransportAdviceDto extends createZodDto(voyaTransportAdviceRequestSchema) {}
