@@ -41,6 +41,9 @@ export const voyaSuggestedActivitySchema = z.object({
 export const voyaDraftDaySchema = z.object({
   dayNumber: z.number().int().positive(),
   date: z.string().regex(isoDate).optional(),
+  destination: z.string().trim().min(1).max(160).optional(),
+  country: z.string().trim().max(100).optional(),
+  isTransferDay: z.boolean().optional().default(false),
   title: z.string().trim().min(1).max(140),
   objective: z.string().trim().min(1).max(320),
   neighborhood: z.string().trim().max(140).optional(),
@@ -299,3 +302,62 @@ export const voyaDestinationResolveResultSchema = z.object({
   }),
 });
 export type VoyaDestinationResolveResult = z.infer<typeof voyaDestinationResolveResultSchema>;
+
+
+export const voyaMultiCityDestinationSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  country: z.string().trim().max(100).optional(),
+  region: z.string().trim().max(120).optional(),
+});
+export type VoyaMultiCityDestination = z.infer<typeof voyaMultiCityDestinationSchema>;
+
+export const voyaMultiCityPlanRequestSchema = z.object({
+  destinations: z.array(voyaMultiCityDestinationSchema).min(2).max(6),
+  startDate: z.string().regex(isoDate).optional(),
+  endDate: z.string().regex(isoDate).optional(),
+  days: z.number().int().min(2).max(30),
+  travelers: z.number().int().min(1).max(20).default(1),
+  currency: z.string().trim().min(3).max(8).default('USD'),
+  pace: z.enum(['relaxed', 'balanced', 'packed']).default('balanced'),
+  budgetStyle: z.enum(['budget', 'moderate', 'premium', 'luxury']).default('moderate'),
+  interests: z.array(z.string().trim().min(1).max(60)).max(12).default([]),
+  notes: z.string().trim().max(1200).optional(),
+  allowReorder: z.boolean().default(true),
+});
+export type VoyaMultiCityPlanRequest = z.infer<typeof voyaMultiCityPlanRequestSchema>;
+
+export const voyaMultiCityLegSchema = z.object({
+  order: z.number().int().min(1).max(6),
+  destination: z.string().trim().min(1).max(120),
+  country: z.string().trim().max(100).optional(),
+  allocatedDays: z.number().int().min(1).max(30),
+  nights: z.number().int().min(0).max(30),
+  baseArea: z.string().trim().max(180).optional(),
+  summary: z.string().trim().min(1).max(420),
+  transportFromPrevious: z.enum(['Train', 'Flight', 'Drive', 'Ferry', 'Bus', 'Transfer/Depends']).optional(),
+  transferDurationLabel: z.string().trim().max(120).optional(),
+  transferNotes: z.string().trim().max(360).optional(),
+});
+export type VoyaMultiCityLeg = z.infer<typeof voyaMultiCityLegSchema>;
+
+export const voyaMultiCityPlanDraftSchema = z.object({
+  title: z.string().trim().min(1).max(180),
+  summary: z.string().trim().min(1).max(900),
+  journeySummary: z.string().trim().min(1).max(700),
+  orderReason: z.string().trim().min(1).max(500),
+  legs: z.array(voyaMultiCityLegSchema).min(2).max(6),
+  days: z.array(voyaDraftDaySchema).min(2).max(30),
+  cautions: z.array(z.string().trim().min(1).max(240)).max(10).default([]),
+  generatedBy: z.object({
+    provider: z.enum(['local', 'openai', 'anthropic']),
+    model: z.string().min(1),
+  }),
+});
+export type VoyaMultiCityPlanDraft = z.infer<typeof voyaMultiCityPlanDraftSchema>;
+
+export const voyaMaterializeMultiCityDraftRequestSchema = z.object({
+  request: voyaMultiCityPlanRequestSchema,
+  draft: voyaMultiCityPlanDraftSchema,
+  reminderDays: z.number().int().min(0).max(30).optional().default(0),
+});
+export type VoyaMaterializeMultiCityDraftRequest = z.infer<typeof voyaMaterializeMultiCityDraftRequestSchema>;
