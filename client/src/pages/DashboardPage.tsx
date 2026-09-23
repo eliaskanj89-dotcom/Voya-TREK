@@ -150,7 +150,7 @@ function DashboardPageDesktop(): React.ReactElement {
           styling instead of inheriting the dashboard scope's font and the
           `.trek-dash button` reset (which shifted the bell icon + menu items). */}
       <Navbar />
-      <div className="trek-dash trek-dash-shell">
+      <div className="trek-dash trek-dash-shell voya-dashboard">
       {demoMode && <DemoBanner />}
       <div className="trek-dash-scroll">
         <MobileTopBar />
