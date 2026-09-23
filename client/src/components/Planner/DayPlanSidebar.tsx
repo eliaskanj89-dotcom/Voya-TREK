@@ -1575,6 +1575,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
           days={days}
           assignments={assignments}
           accommodations={accommodations}
+          reservations={reservations}
           selectedDayId={selectedDayId}
           onOpenToday={(dayId) => onSelectDay(dayId, false)}
           onRouteRefresh={onRouteRefresh}
