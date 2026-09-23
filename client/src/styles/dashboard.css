@@ -765,7 +765,31 @@
 }
 
 /* Floating action button — Neuer Trip */
-.trek-dash .fab-new-trip {
+.trek-dash .fab-discover-trip {
+  position: fixed; right: 28px; bottom: 94px; z-index: 149;
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 44px; padding: 0 18px; border-radius: 999px;
+  border: 1px solid rgba(111,145,186,.22);
+  background: rgba(249,252,255,.88); color: #377CF6;
+  backdrop-filter: blur(22px) saturate(160%);
+  font-size: 13px; font-weight: 600; font-family: inherit;
+  box-shadow: 0 10px 30px rgba(31,67,112,.12);
+  cursor: pointer;
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+.trek-dash .fab-discover-trip:hover {
+  transform: translateY(-2px);
+  border-color: rgba(55,124,246,.34);
+  box-shadow: 0 16px 38px rgba(31,67,112,.16);
+}
+.dark .trek-dash .fab-discover-trip {
+  background: rgba(10,25,44,.84); color: #79AEFF; border-color: rgba(255,255,255,.10);
+}
+@media (max-width: 768px) {
+  .trek-dash .fab-discover-trip { display: none; }
+}
+
+.fab-new-trip {
   position: fixed; right: 28px; bottom: 28px; z-index: 150;
   display: inline-flex; align-items: center; gap: 9px;
   height: 56px; padding: 0 24px; border: none; border-radius: 999px;
