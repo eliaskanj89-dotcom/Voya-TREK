@@ -63,6 +63,6 @@ import { RoadtripHazardsMcp } from './roadtrip-hazards.mcp';
     RoadtripPlanService,
     RoadtripPlanningMcp,
   ],
-  exports: [RoadtripService],
+  exports: [RoadtripService, RoadtripRouterService],
 })
 export class RoadtripModule {}

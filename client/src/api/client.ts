@@ -26,6 +26,11 @@ import {
   type TripCreateGuestRequest, type TripRenameGuestRequest, type AssignmentReorderRequest,
   type PackingReorderRequest, type PackingCreateBagRequest, type TodoReorderRequest,
   type TripCreateRequest, type TripUpdateRequest, type TripCopyRequest, type ActiveTripResponse,
+  type VoyaPlanDraftRequest, type VoyaPlanDraftResponse, type VoyaApplyDayEditRequest, type VoyaApplyTripEditRequest, type VoyaDayEditDraft, type VoyaDayEditRequest,
+  type VoyaMaterializeDraftRequest, type VoyaMaterializeMultiCityDraftRequest, type VoyaMultiCityPlanDraft, type VoyaMultiCityPlanRequest, type VoyaTripEditPlan, type VoyaTripEditRequest, type VoyaVerifyTripRequest, type VoyaVerifyTripResult,
+  type VoyaReadinessBuildRequest, type VoyaReadinessResult, type VoyaReadinessStatusRequest, type VoyaReadinessToTodoRequest, type VoyaReadinessToTodoResult,
+  type VoyaDestinationDiscoveryRequest, type VoyaDestinationDiscoveryResult,
+  type Trip, type Day,
   type DayCreateRequest, type DayUpdateRequest, type DayReorderRequest,
   type PlaceCreateRequest, type PlaceUpdateRequest,
   type ReservationCreateRequest, type ReservationUpdateRequest,
@@ -406,6 +411,45 @@ export const oauthApi = {
     list: () => apiClient.get('/oauth/sessions').then(r => r.data),
     revoke: (id: number) => apiClient.delete(`/oauth/sessions/${id}`).then(r => r.data),
   },
+}
+
+export const voyaAiApi = {
+  discoverDestinations: (data: VoyaDestinationDiscoveryRequest): Promise<VoyaDestinationDiscoveryResult> =>
+    apiClient.post('/voya-ai/discover-destinations', data, { timeout: 120000 }).then(r => r.data),
+  tripHealth: (data: VoyaTripHealthRequest): Promise<VoyaTripHealthResult> =>
+    apiClient.post('/voya-ai/trip-health', data).then(r => r.data),
+  readiness: (data: VoyaReadinessBuildRequest): Promise<VoyaReadinessResult> =>
+    apiClient.post('/voya-ai/readiness', data).then(r => r.data),
+  refreshReadiness: (data: VoyaReadinessBuildRequest): Promise<VoyaReadinessResult> =>
+    apiClient.post('/voya-ai/readiness-refresh', data, { timeout: 120000 }).then(r => r.data),
+  updateReadinessStatus: (data: VoyaReadinessStatusRequest): Promise<VoyaReadinessResult> =>
+    apiClient.post('/voya-ai/readiness-status', data).then(r => r.data),
+  readinessToTodo: (data: VoyaReadinessToTodoRequest): Promise<VoyaReadinessToTodoResult> =>
+    apiClient.post('/voya-ai/readiness-to-todo', data).then(r => r.data),
+  planDraft: (data: VoyaPlanDraftRequest): Promise<{ draft: VoyaPlanDraftResponse }> =>
+    apiClient.post('/voya-ai/plan-draft', data, { timeout: 120000 }).then(r => r.data),
+  planMultiCityDraft: (data: VoyaMultiCityPlanRequest): Promise<{ draft: VoyaMultiCityPlanDraft }> =>
+    apiClient.post('/voya-ai/multi-city-draft', data, { timeout: 120000 }).then(r => r.data),
+  materializeMultiCityDraft: (data: VoyaMaterializeMultiCityDraftRequest): Promise<{ trip: Trip; days: Day[]; draft: VoyaMultiCityPlanDraft }> =>
+    apiClient.post('/voya-ai/materialize-multi-city-draft', data, { timeout: 120000 }).then(r => r.data),
+  materializeDraft: (data: VoyaMaterializeDraftRequest): Promise<{ trip: Trip; days: Day[]; draft: VoyaPlanDraftResponse }> =>
+    apiClient.post('/voya-ai/materialize-draft', data, { timeout: 120000 }).then(r => r.data),
+  verifyTrip: (data: VoyaVerifyTripRequest): Promise<VoyaVerifyTripResult> =>
+    apiClient.post('/voya-ai/verify-trip', data, { timeout: 120000 }).then(r => r.data),
+  transportAdvice: (data: VoyaTransportAdviceRequest): Promise<VoyaTransportAdviceResult> =>
+    apiClient.post('/voya-ai/transport-advice', data, { timeout: 120000 }).then(r => r.data),
+  planTripEdit: (data: VoyaTripEditRequest): Promise<{ plan: VoyaTripEditPlan }> =>
+    apiClient.post('/voya-ai/trip-edit-plan', data, { timeout: 120000 }).then(r => r.data),
+  planDayEdit: (data: VoyaDayEditRequest): Promise<{ draft: VoyaDayEditDraft }> =>
+    apiClient.post('/voya-ai/day-edit-draft', data, { timeout: 120000 }).then(r => r.data),
+  applyDayEdit: (data: VoyaApplyDayEditRequest) =>
+    apiClient.post('/voya-ai/apply-day-edit', data, { timeout: 120000 }).then(r => r.data),
+  editHistory: (data: VoyaEditHistoryRequest): Promise<VoyaEditHistoryResult> =>
+    apiClient.post('/voya-ai/edit-history', data).then(r => r.data),
+  restoreEditSnapshot: (data: VoyaRestoreEditSnapshotRequest) =>
+    apiClient.post('/voya-ai/restore-edit-snapshot', data, { timeout: 120000 }).then(r => r.data),
+  applyTripEdit: (data: VoyaApplyTripEditRequest): Promise<{ tripId: number; affectedDays: number[]; appliedDays: number }> =>
+    apiClient.post('/voya-ai/apply-trip-edit', data, { timeout: 120000 }).then(r => r.data),
 }
 
 export const tripsApi = {

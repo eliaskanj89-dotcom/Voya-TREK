@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from '../../i18n'
-import MDancingTrek, { type TrekScene } from '../../mobile/components/MDancingTrek'
 
 /**
  * Trip-open splash for desktop â€” the same little journey the mobile splash
@@ -15,12 +14,12 @@ import MDancingTrek, { type TrekScene } from '../../mobile/components/MDancingTr
  * freezes and the mascot parks on "loading photos". Palette + glass tint swap
  * for light/dark via the .dark class the app puts on <html>.
  */
-const STEPS: { scene: TrekScene; key: string }[] = [
-  { scene: 'packing', key: 'trip.loadingSteps.pack' },
-  { scene: 'transport', key: 'trip.loadingSteps.road' },
-  { scene: 'dashboard', key: 'trip.loadingPhotos' },
-  { scene: 'collections', key: 'trip.loadingSteps.arrive' },
-]
+const STEPS = [
+  { phase: 'pack', key: 'trip.loadingSteps.pack' },
+  { phase: 'route', key: 'trip.loadingSteps.road' },
+  { phase: 'visual', key: 'trip.loadingPhotos' },
+  { phase: 'arrive', key: 'trip.loadingSteps.arrive' },
+] as const
 const STEP_MS = 1400
 const STILL_INDEX = 2
 
@@ -135,17 +134,31 @@ const SPLASH_CSS = `
   to   { opacity: 1; transform: none; }
 }
 
-/* Monochrome mascot tokens live on the content wrapper. --m-bg is pinned to the
-   frosted card's surface tone (not the page) so the eye cut-outs read clean. */
-.m-splash-content {
-  --m-ink: var(--text-primary);
-  --m-bg: #f3f1f8;
+.voya-splash-mark {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  background:
+    radial-gradient(circle at 32% 22%, rgba(255,255,255,.48), transparent 25%),
+    linear-gradient(145deg, #79AEFF 0%, #377CF6 56%, #245FD3 100%);
+  box-shadow: 0 24px 60px rgba(55,124,246,.30), inset 0 1px 0 rgba(255,255,255,.42);
 }
-.dark .m-splash-content { --m-bg: #1b1a22; }
-
-@keyframes m-trek-beat {
-  from { opacity: 0; transform: translateX(20px); }
-  to   { opacity: 1; transform: translateX(0); }
+.voya-splash-mark::before {
+  content: "";
+  position: absolute;
+  inset: -11px;
+  border-radius: inherit;
+  border: 1px solid rgba(55,124,246,.18);
+  box-shadow: 0 0 0 10px rgba(55,124,246,.035), 0 0 0 22px rgba(55,124,246,.018);
+}
+@keyframes voya-splash-beat {
+  from { opacity: 0; transform: translateY(10px) scale(.92); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* â”€â”€ Motion prefs: freeze the drifting background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -175,7 +188,7 @@ export default function TripLoadingSplash({ title }: { title?: string }) {
     <div
       className="m-splash-root fixed inset-0 z-[100] flex items-center justify-center overflow-hidden"
       role="status"
-      aria-label={title || 'TREK'}
+      aria-label={title || 'Voya'}
     >
       {/* Slowly drifting glass gradient â€” painted behind the card so the frost
           blurs it. */}
@@ -186,14 +199,18 @@ export default function TripLoadingSplash({ title }: { title?: string }) {
 
       <div className="m-splash-card">
         <div className="m-splash-content flex flex-col items-center justify-center">
-          {/* Fixed stage so the travelling mascot never nudges the layout. */}
-          <div className="mb-6 flex h-[150px] w-[160px] items-center justify-center overflow-hidden">
-            <div key={step.scene} style={reduceMotion ? undefined : { animation: 'm-trek-beat 460ms cubic-bezier(.34,1.56,.64,1) both' }}>
-              <MDancingTrek scene={step.scene} mood="happy" size={128} />
+          <div className="mb-7 flex h-[150px] w-[160px] items-center justify-center overflow-visible">
+            <div
+              key={step.phase}
+              className="voya-splash-mark"
+              data-phase={step.phase}
+              style={reduceMotion ? undefined : { animation: 'voya-splash-beat 520ms cubic-bezier(.16,1,.3,1) both' }}
+            >
+              <span className="voya-wordmark relative z-10 text-[44px] text-white">V</span>
             </div>
           </div>
 
-          <div className="mb-2 text-[1.25rem] font-bold tracking-[-0.3px] text-content">{title || 'TREK'}</div>
+          <div className="voya-editorial mb-2 text-[1.45rem] font-medium tracking-[-.035em] text-content">{title || 'Voya'}</div>
 
           <div className="mb-8 flex h-4 items-center justify-center">
             <span key={step.key} className="text-[0.75rem] font-medium uppercase tracking-[2px] text-content-faint">

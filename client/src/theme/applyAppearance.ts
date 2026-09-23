@@ -149,7 +149,7 @@ export function applyAppearance(input: ApplyAppearanceInput): AppearanceConfig {
 
   // theme-color meta — unchanged from before (dark #09090b / light #ffffff).
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', dark ? '#09090b' : '#ffffff')
+  if (meta) meta.setAttribute('content', dark ? '#071B35' : '#F8FBFF')
 
   writeSnapshot({
     v: 1,

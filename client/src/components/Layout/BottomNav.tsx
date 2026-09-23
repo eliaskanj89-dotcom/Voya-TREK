@@ -88,7 +88,7 @@ export default function BottomNav() {
         key={to}
         onClick={() => navigate(to)}
         className="flex flex-col items-center gap-1 py-1 px-1 min-w-0"
-        style={{ color: active ? (dark ? '#fff' : 'oklch(0.22 0 0)') : (dark ? 'oklch(0.6 0 0)' : 'oklch(0.62 0.01 65)') }}
+        style={{ color: active ? (dark ? '#79AEFF' : '#377CF6') : (dark ? '#9FB1C7' : '#68788C') }}
       >
         <Icon size={21} strokeWidth={active ? 2.4 : 1.9} />
         <span className="text-[10px] font-semibold tracking-tight truncate max-w-full">{label}</span>
@@ -122,8 +122,8 @@ export default function BottomNav() {
         style={{
           width: 46, height: 46, marginInline: 8,
           borderRadius: '50%',
-          background: dark ? '#fff' : 'oklch(0.22 0 0)',
-          color: dark ? 'oklch(0.22 0 0)' : '#fff',
+          background: dark ? '#79AEFF' : '#377CF6',
+          color: dark ? '#07111F' : '#fff',
           boxShadow: '0 4px 12px oklch(0 0 0 / .22)',
         }}
       >

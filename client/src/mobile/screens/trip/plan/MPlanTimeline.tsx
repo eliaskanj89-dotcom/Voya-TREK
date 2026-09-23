@@ -2,7 +2,7 @@ import { useRef, useState, type MouseEvent } from 'react'
 import {
   ArrowRight, BedDouble, CalendarDays, CalendarRange, ChevronRight, Compass, LogIn, LogOut,
   MapPin, Pencil, PencilLine, Route, Ticket, TrainFront, Undo2,
-  Car, Footprints, Zap, RotateCcw, TramFront,
+  Car, Footprints, Zap, RotateCcw, TramFront, Sparkles,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useContextMenu, ContextMenu } from '../../../../components/shared/ContextMenu'
@@ -19,13 +19,18 @@ import { ConnRow, HotelConnRow, NoteRow, PlaceRow, PlanScheduleRow, ReorderStack
 import type { RowDrag } from './MPlanTimelineRows'
 import { usePluginDaySchedule } from '../../../../components/Plugins/PluginDaySchedule'
 import { Fragment } from 'react'
-import MDancingTrek from '../../../components/MDancingTrek'
 import type { MPlanTimelineProps } from '../MTripShell'
 import type { MergedItem } from '../../../../utils/dayMerge'
 import type { RouteSegment } from '../../../../types'
 import type { Assignment } from '../../../../types'
 import type { ComponentType, ReactNode } from 'react'
 import GoogleMapsIcon from '../../../../components/shared/GoogleMapsIcon'
+import VoyaDayEditModal from '../../../../components/Planner/VoyaDayEditModal'
+import VoyaTripEditModal from '../../../../components/Planner/VoyaTripEditModal'
+import VoyaLiveTripCard from '../../../../components/Planner/VoyaLiveTripCard'
+import VoyaJourneyStrip from '../../../../components/Planner/VoyaJourneyStrip'
+import { findTodayDayId } from '../../../../components/Planner/today'
+import { useTripStore } from '../../../../store/tripStore'
 import { isRtlLanguage } from '../../../../i18n'
 import { useMPlanDaySwipe } from './useMPlanDaySwipe'
 
@@ -41,6 +46,46 @@ const GLASS_PILL = 'rounded-full border border-[color:var(--m-gbr)] bg-[color:va
 export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
   const tl = useMPlanTimeline(planner)
   const { t, trip, can } = planner
+  const [voyaEditOpen, setVoyaEditOpen] = useState(false)
+  const [voyaEditSeed, setVoyaEditSeed] = useState('')
+  const [voyaTripEditOpen, setVoyaTripEditOpen] = useState(false)
+  const [pendingHealthRouteDayId, setPendingHealthRouteDayId] = useState<number | null>(null)
+  useEffect(() => {
+    const onHealthRepair = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        tripId?: number
+        dayId?: number
+        category?: string
+        instruction?: string
+      }>).detail
+      if (detail?.tripId !== planner.tripId || !detail.dayId) return
+
+      if (detail.category === 'Route') {
+        if (planner.selectedDayId === detail.dayId) {
+          void tl.optimize()
+        } else {
+          setPendingHealthRouteDayId(detail.dayId)
+          planner.handleSelectDay(detail.dayId, true)
+        }
+        return
+      }
+
+      if (detail.category === 'Schedule') {
+        if (planner.selectedDayId !== detail.dayId) planner.handleSelectDay(detail.dayId, true)
+        setVoyaEditSeed(detail.instruction || 'Make this day more realistic and fix its timing.')
+        setVoyaEditOpen(true)
+      }
+    }
+    window.addEventListener('voya:trip-health-repair', onHealthRepair)
+    return () => window.removeEventListener('voya:trip-health-repair', onHealthRepair)
+  }, [planner.tripId, planner.selectedDayId, planner.handleSelectDay, tl])
+
+  useEffect(() => {
+    if (pendingHealthRouteDayId == null || planner.selectedDayId !== pendingHealthRouteDayId) return
+    setPendingHealthRouteDayId(null)
+    void tl.optimize()
+  }, [pendingHealthRouteDayId, planner.selectedDayId, tl])
+
   const canEdit = can('day_edit', trip)
   const editing = shell.mode === 'edit' && canEdit
   const canEditPlaces = can('place_edit', trip)
@@ -62,6 +107,8 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
   const daySchedule = usePluginDaySchedule(planner.tripId)
   const day = tl.day
   const dayId = day?.id
+  const liveTodayDayId = findTodayDayId(planner.days)
+  const liveTripActive = liveTodayDayId != null
   // A stay chip opens the stay, the same way the stay card in the day sheet
   // does: the editor for members who may edit days, otherwise the hotel's
   // place. A stay with neither still leads to the day sheet, so the chip
@@ -149,13 +196,13 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
   const chrome = { editing, t, language: tl.language, timeFormat: tl.timeFormat }
 
   return (
-    <div ref={panelRef} className="absolute inset-0" {...daySwipe.handlers}>
+    <div ref={panelRef} className="voya-mobile-timeline absolute inset-0" {...daySwipe.handlers}>
       <ContextMenu menu={legMenu.menu} onClose={legMenu.close} />
       {/* Swipe-committed day changes only — a chip tap already speaks its own
           button label plus the aria-current flip, so announcing there would say
           the day twice. */}
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">{daySwipe.announcement}</span>
-      {!editing && <UpNextCard tl={tl} t={t} onOpen={openPlace} />}
+      {!editing && !liveTripActive && <UpNextCard tl={tl} t={t} onOpen={openPlace} />}
       {editing && <EditHeader tl={tl} planner={planner} shell={shell} />}
 
       {/* Timeline card — go mode leaves room for the UP-NEXT card above, but
@@ -164,9 +211,43 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
       <div
         ref={cardRef}
         data-touch-drag={editing ? '' : undefined}
-        className="absolute left-4 right-4 overflow-y-auto overscroll-contain rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-3.5 pb-2 pt-1 backdrop-blur-[24px] backdrop-saturate-[1.6] bottom-[calc(env(safe-area-inset-bottom,0px)+90px)]"
-        style={{ top: `calc(var(--m-safe-top, 12px) + ${editing ? 140 : tl.upNext ? 216 : 102}px)` }}
+        className="voya-mobile-timeline-card absolute left-4 right-4 overflow-y-auto overscroll-contain rounded-[26px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-3.5 pb-2 pt-1 backdrop-blur-[24px] backdrop-saturate-[1.6] bottom-[calc(env(safe-area-inset-bottom,0px)+90px)]"
+        style={{ top: `calc(var(--m-safe-top, 12px) + ${editing ? 140 : (!liveTripActive && tl.upNext ? 216 : 102)}px)` }}
       >
+        <VoyaJourneyStrip
+          tripId={planner.tripId}
+          days={planner.days}
+          selectedDayId={planner.selectedDayId}
+          onSelectDay={(journeyDayId) => planner.handleSelectDay(journeyDayId, true)}
+          onAddTransport={(journeyDayId) => {
+            planner.setEditingTransport(null)
+            planner.setTransportModalDayId(journeyDayId)
+            planner.setShowTransportModal(true)
+          }}
+          compact
+        />
+
+        {liveTripActive && (
+          <div className="pb-2 pt-1">
+            <VoyaLiveTripCard
+              tripId={planner.tripId}
+              days={planner.days}
+              assignments={planner.assignments}
+              accommodations={planner.tripAccommodations}
+              reservations={planner.reservations}
+              selectedDayId={planner.selectedDayId}
+              onOpenToday={(todayDayId) => planner.handleSelectDay(todayDayId, true)}
+              onRouteRefresh={() => planner.autoShowRoute()}
+              onAskVoya={(instruction, todayDayId) => {
+                if (planner.selectedDayId !== todayDayId) planner.handleSelectDay(todayDayId, true)
+                setVoyaEditSeed(instruction)
+                setVoyaEditOpen(true)
+              }}
+              compact
+            />
+          </div>
+        )}
+
         {day && (
           <TimelineHeader
             tl={tl}
@@ -266,7 +347,9 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
 
         {tl.rows.length === 0 && !editing && (
           <div className="flex min-h-full flex-1 flex-col items-center justify-center py-8 text-center">
-            <MDancingTrek scene="guide" className="mb-2" />
+            <div aria-hidden className="voya-mobile-orb mb-4 flex h-[68px] w-[68px] items-center justify-center rounded-full">
+              <span className="voya-wordmark text-[28px] text-white">V</span>
+            </div>
             <p className="font-geist text-[0.8125rem] font-medium text-m-muted">{t('dayplan.emptyDay')}</p>
           </div>
         )}
@@ -284,9 +367,42 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
             <PlanAction icon={Route} label={t('dayplan.optimize')} onClick={() => void tl.optimize()} />
             <PlanAction icon={GoogleMapsIcon} label={t('mobileTrip.googleMaps')} onClick={tl.exportGoogleMaps} />
             <PlanAction icon={Compass} label={t('mobileTrip.coMaps')} onClick={tl.exportCoMaps} />
+            <PlanAction icon={Sparkles} label="Ask Voya · Day" onClick={() => { setVoyaEditSeed(''); setVoyaEditOpen(true) }} />
+            <PlanAction icon={Sparkles} label="Ask Voya · Trip" onClick={() => setVoyaTripEditOpen(true)} />
           </div>
         )}
       </div>
+
+      <VoyaTripEditModal
+        isOpen={voyaTripEditOpen}
+        onClose={() => setVoyaTripEditOpen(false)}
+        tripId={planner.tripId}
+        tripTitle={trip?.title || 'Trip'}
+        days={planner.days}
+        assignments={planner.assignments}
+        onDayApplied={async () => {
+          await useTripStore.getState().loadTrip(planner.tripId)
+          planner.autoShowRoute()
+        }}
+      />
+
+      {day && (
+        <VoyaDayEditModal
+          isOpen={voyaEditOpen}
+          onClose={() => { setVoyaEditOpen(false); setVoyaEditSeed('') }}
+          tripId={planner.tripId}
+          dayId={day.id}
+          dayLabel={dayLabel}
+          assignments={planner.assignments[String(day.id)] || []}
+          initialInstruction={voyaEditSeed}
+          autoPreview={!!voyaEditSeed}
+          onApplied={async () => {
+            await useTripStore.getState().loadTrip(planner.tripId)
+            planner.autoShowRoute()
+            planner.toast.success('Voya updated this day.')
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -307,7 +423,7 @@ function UpNextCard({ tl, t, onOpen }: {
     <button
       type="button"
       onClick={() => onOpen(upNext.assignment)}
-      className="absolute left-4 right-4 cursor-pointer rounded-[22px] border border-[color:var(--m-inbr)] bg-[color:var(--m-inner)] px-4 py-3.5 text-left shadow-[0_18px_44px_-18px_rgba(0,0,0,.3)] backdrop-blur-[28px] backdrop-saturate-[1.8] top-[calc(var(--m-safe-top,12px)+102px)]"
+      className="voya-mobile-day-hero absolute left-4 right-4 cursor-pointer rounded-[26px] border border-[color:var(--m-inbr)] bg-[color:var(--m-inner)] px-4 py-3.5 text-left shadow-[0_18px_44px_-18px_rgba(0,0,0,.3)] backdrop-blur-[28px] backdrop-saturate-[1.8] top-[calc(var(--m-safe-top,12px)+102px)]"
     >
       <div className="flex items-center justify-between">
         <span className="whitespace-nowrap font-geist text-[0.65625rem] font-bold uppercase tracking-[.08em] text-m-muted">
@@ -327,7 +443,7 @@ function UpNextCard({ tl, t, onOpen }: {
                 {time}
               </span>
             )}
-            <span className="min-w-0 truncate text-[1.125rem] font-bold">{place?.name}</span>
+            <span className="voya-editorial min-w-0 truncate text-[1.25rem] font-medium tracking-[-.03em]">{place?.name}</span>
           </div>
           {sub && <MarkdownText clamp className="mt-[2px] font-geist text-[0.75rem] text-m-muted">{sub}</MarkdownText>}
         </div>

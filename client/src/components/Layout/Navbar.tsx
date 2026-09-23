@@ -97,19 +97,19 @@ export default function Navbar({ tripTitle, tripId, onBack, showBack, onShare }:
   return (
     <nav style={{
       background: dark
-        ? (scrolled ? 'rgba(9,9,11,0.78)' : 'rgba(9,9,11,0.95)')
-        : (scrolled ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.95)'),
+        ? (scrolled ? 'rgba(7,17,31,0.82)' : 'rgba(7,17,31,0.90)')
+        : (scrolled ? 'rgba(248,251,255,0.82)' : 'rgba(255,255,255,0.88)'),
       backdropFilter: scrolled ? 'blur(28px) saturate(180%)' : 'blur(20px)',
       WebkitBackdropFilter: scrolled ? 'blur(28px) saturate(180%)' : 'blur(20px)',
-      borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`,
+      borderBottom: 'none',
       boxShadow: scrolled
         ? (dark ? '0 4px 24px rgba(0,0,0,0.35)' : '0 4px 24px rgba(0,0,0,0.08)')
         : (dark ? '0 1px 12px rgba(0,0,0,0.2)' : '0 1px 12px rgba(0,0,0,0.05)'),
       touchAction: 'manipulation',
       paddingTop: 'env(safe-area-inset-top, 0px)',
-      height: 'var(--nav-h)',
+      height: '58px',
       transition: 'background 240ms cubic-bezier(0.23,1,0.32,1), backdrop-filter 240ms cubic-bezier(0.23,1,0.32,1), box-shadow 240ms cubic-bezier(0.23,1,0.32,1)',
-    }} className="hidden md:flex items-center px-4 gap-4 fixed top-0 left-0 right-0 z-[200]">
+    }} className="voya-glass hidden md:flex items-center px-4 gap-4 fixed top-4 left-1/2 -translate-x-1/2 z-[200] w-[calc(100%-2rem)] max-w-[1180px] rounded-[24px]">
       {/* Left side. flex-1 basis-0, matching the action cluster on the right, so
           the tab pill between them sits in the middle of the bar rather than
           being centred on top of both (#1983). */}
@@ -124,9 +124,9 @@ export default function Navbar({ tripTitle, tripId, onBack, showBack, onShare }:
           </button>
         )}
 
-        <Link to="/dashboard" className="flex items-center transition-colors flex-shrink-0">
-          <img src={dark ? '/icons/icon-white.svg' : '/icons/icon-dark.svg'} alt="TREK" className="sm:hidden" style={{ height: 22, width: 22 }} />
-          <img src={dark ? '/logo-light.svg' : '/logo-dark.svg'} alt="TREK" className="hidden sm:block" style={{ height: 28 }} />
+        <Link to="/dashboard" className="flex items-center transition-colors flex-shrink-0" aria-label="Voya home">
+          <span className="sm:hidden flex h-8 w-8 items-center justify-center rounded-full bg-[#377CF6] text-white text-sm font-semibold shadow-[0_8px_20px_rgba(55,124,246,.28)]">V</span>
+          <span className="hidden sm:block voya-wordmark text-[28px]">Voya</span>
         </Link>
 
         {tripTitle && (
@@ -322,7 +322,7 @@ export default function Navbar({ tripTitle, tripId, onBack, showBack, onShare }:
                     <div className="px-4 pt-2 pb-2.5 text-center border-t border-edge-secondary" style={{ marginTop: 4 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'var(--bg-tertiary)', borderRadius: 99, padding: '4px 12px' }}>
-                          <img src={dark ? '/text-light.svg' : '/text-dark.svg'} alt="TREK" style={{ height: 10, opacity: 0.5 }} />
+                          <span className="voya-wordmark" style={{ fontSize: 14, opacity: 0.72 }}>Voya</span>
                           <span style={{ fontSize: 'calc(10px * var(--fs-scale-caption, 1))', fontWeight: 600, color: 'var(--text-faint)' }}>v{appVersion}</span>
                         </div>
                         <a href="https://discord.gg/NhZBDSd4qW" target="_blank" rel="noopener noreferrer"

@@ -91,3 +91,7 @@ export * from './roadtrip/google-import.schema';
 export * from './roadtrip/charging.schema';
 
 export * from './vacay/school-holiday-catalog.schema';
+
+export * from './voya-ai/voya-ai.schema';
+
+export * from './route/optimizeRoute';

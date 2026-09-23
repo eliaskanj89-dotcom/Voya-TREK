@@ -24,7 +24,7 @@ export function PlacesList({ header, ...S }: SidebarState & {
   // Plugin-contributed columns/actions for the places view, keyed by place id (#plugins).
   const contribFor = usePluginViewContributions('places', tripId)
   return (
-    <div className="trek-stagger" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }} ref={scrollContainerRef} onScroll={(e) => onScrollTopChange?.((e.currentTarget as HTMLElement).scrollTop)}>
+    <div className="trek-stagger voya-places-list" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }} ref={scrollContainerRef} onScroll={(e) => onScrollTopChange?.((e.currentTarget as HTMLElement).scrollTop)}>
       {header}
       {filtered.length === 0 ? (
         /* The mascot and one line, the shape every other empty state in TREK has.

@@ -7,7 +7,7 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import { markdownLinkComponents } from '../shared/markdownLink'
-import { X, Clock, MapPin, ExternalLink, Phone, Banknote, Edit2, Trash2, Plus, Minus, ChevronDown, ChevronUp, FileText, Upload, File, FileImage, Star, Navigation, Map as MapIcon, Users, Mountain, TrendingUp, Bookmark, BookmarkCheck, Copy, Route, StickyNote } from 'lucide-react'
+import { X, Clock, MapPin, ExternalLink, Phone, Banknote, Edit2, Trash2, Plus, Minus, ChevronDown, ChevronUp, FileText, Upload, File, FileImage, Star, Navigation, Map as MapIcon, Users, Mountain, TrendingUp, Bookmark, BookmarkCheck, Copy, Route, StickyNote, Sparkles, ShieldCheck } from 'lucide-react'
 import PlaceAvatar from '../shared/PlaceAvatar'
 import PlaceAvatarUpload from '../shared/PlaceAvatarUpload'
 import PlaceRating from '../shared/StarRating'
@@ -35,6 +35,7 @@ import { useTripStore } from '../../store/tripStore'
 import { useCanDo } from '../../store/permissionsStore'
 import { formatDistance, formatElevation } from '../../utils/units'
 import { getNavigationTargets, openNavigationTarget } from './placeNavigation'
+import { getVoyaPlaceTrust } from '../../utils/voyaTrust'
 import { TRANSPORT_TYPES, getAssignmentReservations } from '../../utils/dayMerge'
 import { NavigationMenu } from '../shared/NavigationMenu'
 import { resolveOpenNow, resolvePlaceTimeZone, placeWeekdayIndex } from './placeOpenState'
@@ -333,6 +334,7 @@ export default function PlaceInspector({
   if (!place) return null
 
   const category = categories?.find(c => c.id === place.category_id)
+  const voyaTrust = mode === 'trip' ? getVoyaPlaceTrust(place) : null
   const dayAssignments = selectedDayId ? (assignments[String(selectedDayId)] || []) : []
   const assignmentInDay = selectedDayId
     ? ((selectedAssignmentId ? dayAssignments.find(a => a.id === selectedAssignmentId) : null)
@@ -404,6 +406,22 @@ export default function PlaceInspector({
 
           {/* Info-Chips — hidden on mobile, shown on desktop */}
           <div className="hidden sm:flex" style={{ flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            {voyaTrust === 'suggested' && (
+              <Chip
+                icon={<Sparkles size={12} />}
+                text="Voya suggestion"
+                color="#A16207"
+                bg="rgba(245,158,11,.10)"
+              />
+            )}
+            {voyaTrust === 'matched' && (
+              <Chip
+                icon={<ShieldCheck size={12} />}
+                text="Provider matched"
+                color="#198754"
+                bg="rgba(25,135,84,.10)"
+              />
+            )}
             {googleDetails?.rating && (() => {
               const shortReview = (googleDetails.reviews || []).find(r => r.text && r.text.length > 5)
               return (

@@ -264,7 +264,7 @@ export default function SharedTripPage() {
             border: '1px solid rgba(255,255,255,0.1)',
           }}
         >
-          <img src="/icons/icon-white.svg" alt="TREK" width="26" height="26" />
+          <span className="voya-wordmark" aria-label="Voya" style={{ color: 'white', fontSize: 24 }}>V</span>
         </div>
 
         <div
@@ -277,7 +277,7 @@ export default function SharedTripPage() {
             marginBottom: 12,
           }}
         >
-          Travel Resource & Exploration Kit
+          Plan trips that flow.
         </div>
 
         <h1
@@ -1222,9 +1222,9 @@ export default function SharedTripPage() {
               boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
             }}
           >
-            <img src="/icons/icon.svg" alt="TREK" width="18" height="18" style={{ borderRadius: 4 }} />
+            <span className="voya-wordmark text-[#377CF6]" aria-hidden style={{ fontSize: 17 }}>V</span>
             <span className="text-[#9ca3af]" style={{ fontSize: 'calc(11px * var(--fs-scale-caption, 1))' }}>
-              {t('shared.sharedVia')} <strong className="text-[#6b7280]">TREK</strong>
+              {t('shared.sharedVia')} <strong className="text-[#6b7280]">Voya</strong>
             </span>
           </div>
           <div className="text-[#d1d5db]" style={{ marginTop: 8, fontSize: 'calc(10px * var(--fs-scale-caption, 1))' }}>

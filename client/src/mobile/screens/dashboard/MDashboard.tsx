@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import {
-  Archive, ArchiveRestore, ArrowRight, Bell, CalendarDays, CalendarPlus, Copy,
+  Archive, ArchiveRestore, ArrowRight, Bell, CalendarDays, CalendarPlus, Copy, Compass,
   LayoutGrid, List, MapPin, Pencil, Plus, RefreshCw, Trash2, Users,
 } from 'lucide-react'
 import { useTranslation } from '../../../i18n'
-import MDancingTrek from '../../components/MDancingTrek'
 import { useDashboard } from '../../../pages/dashboard/useDashboard'
 import {
   type DashboardTrip, MS_PER_DAY, daysUntil, getTripStatus,
@@ -57,7 +56,7 @@ export default function MDashboard(): React.ReactElement {
     demoMode, locale, t, navigate,
     spotlight, upcoming, gridTrips, isLoading, loadError, retryLoad,
     tripFilter, setTripFilter, viewMode, toggleViewMode,
-    showForm, setShowForm, editingTrip, setEditingTrip,
+    showForm, setShowForm, createSeed, setCreateSeed, editingTrip, setEditingTrip,
     deleteTrip, setDeleteTrip, copyTrip, setCopyTrip, applyCoverUpdate,
     handleCreate, handleUpdate, confirmDelete, handleArchive, handleUnarchive, confirmCopy,
   } = useDashboard()
@@ -83,7 +82,7 @@ export default function MDashboard(): React.ReactElement {
 
   useEffect(() => { if (isAuthenticated) fetchUnreadCount() }, [isAuthenticated, fetchUnreadCount])
 
-  const openCreate = () => { setEditingTrip(null); setShowForm(true) }
+  const openCreate = () => { setCreateSeed(null); setEditingTrip(null); setShowForm(true) }
   const openEdit = (trip: DashboardTrip) => { setEditingTrip(trip); setShowForm(true) }
 
   const isArchivedFilter = tripFilter === 'archive'
@@ -170,7 +169,9 @@ export default function MDashboard(): React.ReactElement {
 
         {showEmpty && (
           <div className="mt-[10px] flex flex-col items-center rounded-[20px] border border-[color:var(--m-gbr)] bg-[color:var(--m-glass)] px-4 py-8 text-center">
-            <MDancingTrek scene="dashboard" size={96} className="mb-2" />
+            <div aria-hidden className="voya-mobile-orb mb-3 flex h-[72px] w-[72px] items-center justify-center rounded-full">
+              <span className="voya-wordmark text-[30px] text-white">V</span>
+            </div>
             <div className="text-[0.9375rem] font-bold">{t('dashboard.emptyTitle')}</div>
             <div className="mt-1 font-geist text-[0.6875rem] text-m-muted">{t('dashboard.emptyText')}</div>
             <button
@@ -180,6 +181,14 @@ export default function MDashboard(): React.ReactElement {
             >
               <Plus size={14} strokeWidth={2.4} />
               {t('dashboard.emptyButton')}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/discover')}
+              className="mt-2 flex items-center gap-[6px] rounded-full border border-[color:var(--m-gbr)] bg-[color:var(--m-glass)] px-4 py-[9px] text-[0.75rem] font-semibold text-m-ink"
+            >
+              <Compass size={14} strokeWidth={2.2} />
+              Help me choose
             </button>
           </div>
         )}
@@ -225,14 +234,17 @@ export default function MDashboard(): React.ReactElement {
           type="button"
           // The page itself is the scroller since #1809, no inner container to walk up to.
           onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-          aria-label="TREK"
+          aria-label="Voya"
           className="flex flex-none items-center gap-[7px]"
         >
-          <span className="flex h-[38px] w-[38px] items-center justify-center rounded-[11px] bg-[#101013]">{/* theme-lint-disable — brand tile stays black in both themes */}
-            <img src="/icons/icon-white.svg" alt="" className="block h-[22px] w-[22px]" />
+          <span className="voya-mobile-brand flex h-[38px] items-center justify-center px-[10px]">
+            <span className="voya-wordmark text-[24px] text-m-ink">Voya</span>
           </span>
         </button>
         <div className="min-w-0 flex-1" />
+        <MIconBtn ariaLabel="Discover destinations" onClick={() => navigate('/discover')}>
+          <Compass size={18} strokeWidth={2} />
+        </MIconBtn>
         <MIconBtn ariaLabel={t('notifications.title')} onClick={() => navigate('/notifications')}>
           <Bell size={18} strokeWidth={2} />
           {unread > 0 && (
@@ -256,7 +268,7 @@ export default function MDashboard(): React.ReactElement {
 
       {demoMode && <DemoBanner />}
 
-      <div className="px-4 pb-[calc(var(--bottom-nav-h,84px)+32px)] pt-[calc(var(--m-safe-top,12px)+82px)]">
+      <div className="voya-mobile-dashboard px-4 pb-[calc(var(--bottom-nav-h,84px)+32px)] pt-[calc(var(--m-safe-top,12px)+82px)]">
         {loadError && (
           <div role="alert" className="mb-3 flex items-center gap-3 rounded-[20px] border border-[color:var(--m-gbr)] bg-[color:var(--m-glass)] p-[14px]">
             <span className="min-w-0 flex-1 text-[0.8125rem] font-medium text-m-ink">{t('dashboard.loadErrorBanner')}</span>
@@ -294,7 +306,14 @@ export default function MDashboard(): React.ReactElement {
       <MNewTripSheet
         open={showForm}
         trip={editingTrip}
-        onClose={() => { setShowForm(false); setEditingTrip(null) }}
+        initialDestination={!editingTrip ? createSeed?.destination : undefined}
+        initialDayCount={!editingTrip ? createSeed?.days : undefined}
+        initialVoyaSeed={!editingTrip && createSeed ? {
+          budgetStyle: createSeed.budgetStyle,
+          interests: createSeed.interests,
+          notes: createSeed.notes,
+        } : undefined}
+        onClose={() => { setShowForm(false); setEditingTrip(null); setCreateSeed(null) }}
         onSave={editingTrip ? handleUpdate : handleCreate}
         onCoverUpdate={applyCoverUpdate}
         onArchive={editingTrip
@@ -377,7 +396,7 @@ function MSpotlightCard({ trip, t, onOpen, actions }: {
       tabIndex={0}
       onClick={onOpen}
       onKeyDown={e => { if (e.key === 'Enter') onOpen() }}
-      className="relative h-[300px] cursor-pointer overflow-hidden rounded-[26px] shadow-[0_24px_56px_-22px_rgba(0,0,0,.5)]"
+      className="voya-mobile-spotlight relative h-[330px] cursor-pointer overflow-hidden rounded-[30px] shadow-[0_28px_70px_-24px_rgba(17,46,82,.52)]"
     >
       {trip.cover_image
         ? <img src={trip.cover_image} alt={trip.title} className="absolute inset-0 h-full w-full object-cover" />
@@ -396,7 +415,7 @@ function MSpotlightCard({ trip, t, onOpen, actions }: {
             </span>
           )}
         </span>
-        <div className="mt-[7px] truncate text-[1.4375rem] font-bold">{trip.title}</div>
+        <div className="voya-editorial mt-[8px] truncate text-[1.75rem] font-medium tracking-[-.035em]">{trip.title}</div>
         {ongoing && (
           <div className="relative mb-2 mt-[9px] h-1 rounded-full bg-white/25">
             <span className="absolute bottom-0 left-0 top-0 rounded-full bg-white" style={{ width: `${progress}%` }} />
@@ -505,7 +524,7 @@ function MTripGridCard({ trip, locale, badge, pluginBadges, actions, onOpen }: {
       tabIndex={0}
       onClick={onOpen}
       onKeyDown={e => { if (e.key === 'Enter') onOpen() }}
-      className="min-w-0 cursor-pointer overflow-hidden rounded-[20px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)]"
+      className="voya-mobile-trip-card min-w-0 cursor-pointer overflow-hidden rounded-[24px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)]"
     >
       <div className="relative h-[96px]" style={coverStyle(trip)}>
         <div className="absolute inset-0 bg-[image:linear-gradient(180deg,rgba(0,0,0,.32),rgba(0,0,0,0)_60%)]" />

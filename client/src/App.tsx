@@ -41,6 +41,7 @@ const PluginPage = lazyWithRetry(() => import('./pages/PluginPage'))
 const ForgotPasswordPage = lazyWithRetry(() => import('./pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'))
 const DashboardPage = lazyWithRetry(() => import('./pages/DashboardPage'))
+const DiscoverPage = lazyWithRetry(() => import('./pages/DiscoverPage'))
 const TripPlannerPage = lazyWithRetry(() => import('./pages/TripPlannerPage'))
 const FilesPage = lazyWithRetry(() => import('./pages/FilesPage'))
 const AdminPage = lazyWithRetry(() => import('./pages/AdminPage'))
@@ -445,6 +446,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ViewportRoute phone={MDashboardScreen} desktop={DashboardPage} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/discover"
+            element={
+              <ProtectedRoute>
+                <DiscoverPage />
               </ProtectedRoute>
             }
           />

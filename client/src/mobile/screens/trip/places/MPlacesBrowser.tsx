@@ -1,13 +1,13 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   Bookmark, Check, CheckCheck, CheckCircle2, Download, ListChecks, Loader2, MapPin, Plus,
-  SlidersHorizontal, Tag, Trash2, X,
+  SlidersHorizontal, Sparkles, Tag, Trash2, X,
 } from 'lucide-react'
-import MDancingTrek from '../../../components/MDancingTrek'
 import { useTripStore } from '../../../../store/tripStore'
 import { useAddonStore } from '../../../../store/addonStore'
 import { useToast } from '../../../../components/shared/Toast'
 import { collectionsApi } from '../../../../api/collections'
+import { voyaAiApi } from '../../../../api/client'
 import PlaceAvatar from '../../../../components/shared/PlaceAvatar'
 import MarkdownText from '../../../../components/shared/MarkdownText'
 import { getCategoryIcon } from '../../../../components/shared/categoryIcons'
@@ -22,6 +22,7 @@ import type { Place } from '../../../../types'
 import MPlacesBulkCategorySheet from './MPlacesBulkCategorySheet'
 import MPlacesSaveToCollectionSheet from './MPlacesSaveToCollectionSheet'
 import { filterPool, firstPlannedDayNumbers, plannedPlaceIds } from './placesBrowserModel'
+import { getVoyaPlaceTrust } from '../../../../utils/voyaTrust'
 
 /**
  * Fullscreen places pool (mode === 'browse'): All/Unplanned/Tracks filter
@@ -43,6 +44,7 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
 
   const filter = useTripStore(s => s.placesFilter)
   const setFilter = useTripStore(s => s.setPlacesFilter)
+  const loadTrip = useTripStore(s => s.loadTrip)
   const categoryFilters = useTripStore(s => s.placesCategoryFilter)
   const setCategoryFilters = useTripStore(s => s.setPlacesCategoryFilter)
 
@@ -55,6 +57,33 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
   const [markVisitedBusy, setMarkVisitedBusy] = useState(false)
   const toast = useToast()
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [voyaVerifyBusy, setVoyaVerifyBusy] = useState(false)
+  const [voyaVerifySummary, setVoyaVerifySummary] = useState<{ verified: number; unresolved: number; optimizedDays: number } | null>(null)
+  const voyaSuggestionCount = useMemo(
+    () => places.filter(place =>
+      /Suggested by Voya — verify current details before relying on them\./i.test(place.notes || '')
+    ).length,
+    [places],
+  )
+
+  const verifyVoyaSuggestions = async () => {
+    if (voyaVerifyBusy || voyaSuggestionCount === 0) return
+    setVoyaVerifyBusy(true)
+    try {
+      const result = await voyaAiApi.verifyTrip({ tripId: planner.tripId })
+      setVoyaVerifySummary({ verified: result.verified, unresolved: result.unresolved, optimizedDays: result.optimizedDays })
+      await loadTrip(planner.tripId)
+      if (result.verified > 0) {
+        toast.success(`Voya matched ${result.verified} suggestion${result.verified === 1 ? '' : 's'} to real map records${result.optimizedDays > 0 ? ` and optimized ${result.optimizedDays} day${result.optimizedDays === 1 ? '' : 's'}` : ''}.`)
+      } else {
+        toast.warning('Voya could not confidently match these suggestions yet.')
+      }
+    } catch {
+      toast.error('Voya could not verify these places right now.')
+    } finally {
+      setVoyaVerifyBusy(false)
+    }
+  }
 
   // Entering the browser from the edit segment starts on the unplanned pool.
   useEffect(() => {
@@ -151,7 +180,7 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
   const hasUncategorized = places.some(p => p.category_id == null)
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="voya-mobile-places flex h-full flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(var(--bottom-nav-h,84px)+22px)] pt-[calc(var(--m-safe-top,12px)+58px)]">
         {/* ── Filter chips + Import (Add sits in the search row below to free space) ── */}
         <div className="flex items-center gap-[6px]">
@@ -237,6 +266,36 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
             </button>
           )}
         </div>
+
+        {voyaSuggestionCount > 0 && (
+          <div className="voya-mobile-verification mt-3 rounded-[22px] border border-[color:var(--m-rowbr)] bg-[color:var(--m-glass)] p-3.5 backdrop-blur-[24px]">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-m-act text-m-actfg shadow-[0_8px_20px_rgba(55,124,246,.24)]">
+                <Sparkles size={15} strokeWidth={2.2} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[0.8125rem] font-semibold text-m-ink">Verify Voya suggestions</div>
+                <p className="mt-0.5 font-geist text-[0.65625rem] leading-relaxed text-m-muted">
+                  Match {voyaSuggestionCount} suggested place{voyaSuggestionCount === 1 ? '' : 's'} to real map records.
+                </p>
+                {voyaVerifySummary && (
+                  <div className="mt-1.5 font-geist text-[0.625rem] font-medium text-m-muted">
+                    {voyaVerifySummary.verified} matched · {voyaVerifySummary.unresolved} unresolved{voyaVerifySummary.optimizedDays > 0 ? ` · ${voyaVerifySummary.optimizedDays} day${voyaVerifySummary.optimizedDays === 1 ? '' : 's'} optimized` : ''}
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={voyaVerifyBusy}
+              onClick={() => { void verifyVoyaSuggestions() }}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-m-act px-3 py-[9px] text-[0.6875rem] font-semibold text-m-actfg shadow-[0_8px_20px_rgba(55,124,246,.20)] disabled:opacity-60"
+            >
+              {voyaVerifyBusy ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={13} />}
+              {voyaVerifyBusy ? 'Checking providers…' : 'Verify now'}
+            </button>
+          </div>
+        )}
 
         {/* Stays Dawarich recorded on these dates (#2279). Same component as the
             desktop rail — the rows are the same rows, and the panel renders
@@ -331,12 +390,16 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
         {filtered.length === 0 ? (
           filter === 'unplanned' && !search && categoryFilters.size === 0 ? (
             <div className="flex min-h-[60vh] flex-col items-center justify-center px-8 py-10 text-center">
-              <MDancingTrek scene="idle" mood="happy" className="mb-2" />
+              <div aria-hidden className="voya-mobile-orb mb-4 flex h-[68px] w-[68px] items-center justify-center rounded-full">
+                <span className="voya-wordmark text-[28px] text-white">V</span>
+              </div>
               <p className="font-geist text-[0.8125rem] font-medium text-m-muted">{t('places.allPlanned')}</p>
             </div>
           ) : (
             <div className="flex min-h-[60vh] flex-col items-center justify-center px-8 py-10 text-center">
-              <MDancingTrek scene="search" className="mb-2" />
+              <div aria-hidden className="voya-mobile-orb mb-4 flex h-[68px] w-[68px] items-center justify-center rounded-full">
+                <span className="voya-wordmark text-[28px] text-white">V</span>
+              </div>
               <p className="font-geist text-[0.8125rem] font-medium text-m-muted">{t('places.noneFound')}</p>
             </div>
           )
@@ -346,8 +409,9 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
             const CatIcon = getCategoryIcon(cat?.icon)
             const dayNumber = dayNumberByPlace.get(place.id)
             const sub = place.address || place.description
+            const voyaTrust = getVoyaPlaceTrust(place)
             return (
-              <div key={place.id} className="flex items-center gap-[11px] border-b border-[color:var(--m-rowbr)] px-[2px] py-[9px]">
+              <div key={place.id} className="voya-mobile-place-row flex items-center gap-[11px] border border-[color:var(--m-rowbr)] px-[10px] py-[10px]">
                 <button type="button" onClick={() => openRow(place)} className="flex min-w-0 flex-1 items-center gap-[11px] text-left">
                   {selectMode && <SquareCheck big checked={selectedIds.has(place.id)} />}
                   <PlaceAvatar place={place} category={cat} size={40} />
@@ -365,6 +429,17 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
                       <CatIcon size={12} strokeWidth={2.2} className="flex-none" style={{ color: cat?.color || 'var(--m-muted)' }} />
                       <span className="truncate text-[0.8125rem] font-semibold text-m-ink">{place.name}</span>
                     </span>
+                    {voyaTrust && (
+                      <div className="mt-1">
+                        <span className={`inline-flex rounded-full px-2 py-[2px] font-geist text-[0.53125rem] font-bold uppercase tracking-[.06em] ${
+                          voyaTrust === 'matched'
+                            ? 'bg-[#198754]/10 text-[#198754]'
+                            : 'bg-[#F59E0B]/10 text-[#A16207] dark:text-[#FBBF24]'
+                        }`}>
+                          {voyaTrust === 'matched' ? 'Provider matched' : 'Voya suggestion'}
+                        </span>
+                      </div>
+                    )}
                     {sub && (
                       <MarkdownText clamp className="mt-px font-geist text-[0.65625rem] text-m-muted">{sub}</MarkdownText>
                     )}

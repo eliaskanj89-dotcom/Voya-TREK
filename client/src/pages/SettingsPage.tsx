@@ -1,10 +1,11 @@
 import React from 'react'
-import { Settings, SlidersHorizontal, Paintbrush, Map, Bell, Plug, CloudOff, User, Info, Blocks } from 'lucide-react'
+import { Settings, SlidersHorizontal, Paintbrush, Map, Bell, Plug, CloudOff, User, Info, Blocks, Sparkles } from 'lucide-react'
 import { useTranslation } from '../i18n'
 import PageShell from '../components/Layout/PageShell'
 import PageSidebar, { type PageSidebarTab } from '../components/Layout/PageSidebar'
 import DisplaySettingsTab from '../components/Settings/DisplaySettingsTab'
 import AppearanceSettingsTab from '../components/Settings/AppearanceSettingsTab'
+import VoyaTravelerDnaTab from '../components/Settings/VoyaTravelerDnaTab'
 import MapSettingsTab from '../components/Settings/MapSettingsTab'
 import NotificationsTab from '../components/Settings/NotificationsTab'
 import IntegrationsTab from '../components/Settings/IntegrationsTab'
@@ -30,6 +31,7 @@ function SettingsPageDesktop(): React.ReactElement {
   const tabs: PageSidebarTab[] = [
     { id: 'display', label: t('settings.tabs.display'), icon: SlidersHorizontal },
     { id: 'appearance', label: t('settings.tabs.appearance'), icon: Paintbrush },
+    { id: 'traveler', label: 'Traveler DNA', icon: Sparkles },
     { id: 'map', label: t('settings.tabs.map'), icon: Map },
     { id: 'notifications', label: t('settings.tabs.notifications'), icon: Bell },
     ...(hasIntegrations
@@ -88,6 +90,7 @@ function SettingsPageDesktop(): React.ReactElement {
           >
             {activeTab === 'display' && <DisplaySettingsTab />}
             {activeTab === 'appearance' && <AppearanceSettingsTab />}
+            {activeTab === 'traveler' && <VoyaTravelerDnaTab />}
             {activeTab === 'map' && <MapSettingsTab />}
             {activeTab === 'notifications' && <NotificationsTab />}
             {activeTab === 'integrations' && hasIntegrations && <IntegrationsTab />}

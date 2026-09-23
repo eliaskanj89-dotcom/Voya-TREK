@@ -14,11 +14,14 @@ import MPlacesBrowser from './places/MPlacesBrowser'
 import MTripTabPanel from './tabs/MTripTabPanel'
 import MTripSheets from './sheets/MTripSheets'
 import MTripLoadingSplash from './MTripLoadingSplash'
+import MVoyaReadinessButton from './MVoyaReadinessButton'
+import VoyaTripHealthPanel from '../../../components/Planner/VoyaTripHealthPanel'
 import { usePluginDayTints, dayTintBackground } from '../../../components/Plugins/PluginDaySchedule'
 import { stageOf } from '../../../components/Roadtrip/roadtripRowModel'
 import { badgeLabel, distanceBadge } from './roadtrip/stageBadges'
 import type { CorridorReach } from '../../../components/Roadtrip/corridorSearchModel'
 import { useSettingsStore } from '../../../store/settingsStore'
+import { useTripStore } from '../../../store/tripStore'
 import { useAuthStore } from '../../../store/authStore'
 import { canManageDocSync } from '../../../components/Files/docsync/useDocSync'
 import { useDocSyncOffered } from '../../../components/Files/docsync/useDocSyncOffered'
@@ -204,6 +207,21 @@ export default function MTripShell({
 }: MTripShellProps) {
   const planner = useTripPlanner()
   const { t, language, tripId, days, trip, navigate, packingItems, todoItems } = planner
+  const hydrateActiveTrip = useTripStore(s => s.hydrateActiveTrip)
+
+  useEffect(() => {
+    const refreshFromVoya = (event: Event) => {
+      const detail = (event as CustomEvent<{ tripId?: number }>).detail
+      if (detail?.tripId !== tripId) return
+      void hydrateActiveTrip(tripId)
+    }
+    window.addEventListener('voya:enrichment-complete', refreshFromVoya)
+    window.addEventListener('voya:places-verified', refreshFromVoya)
+    return () => {
+      window.removeEventListener('voya:enrichment-complete', refreshFromVoya)
+      window.removeEventListener('voya:places-verified', refreshFromVoya)
+    }
+  }, [tripId, hydrateActiveTrip])
 
   // Per-day colours from the dayTintProvider plugin hook — the mobile counterpart
   // of the desktop day-card wash, carried on the day chips. Empty without a plugin.
@@ -377,6 +395,26 @@ export default function MTripShell({
   const openSheet = (id: string, payload?: unknown) => setSheet({ id, payload })
   const closeSheet = () => setSheet(null)
 
+  useEffect(() => {
+    const onOpenReadiness = (event: Event) => {
+      const detail = (event as CustomEvent<{ tripId?: number }>).detail
+      if (detail?.tripId !== tripId) return
+      openSheet('readiness')
+    }
+    const onOpenReservations = (event: Event) => {
+      const detail = (event as CustomEvent<{ tripId?: number }>).detail
+      if (detail?.tripId !== tripId) return
+      setTrTab('buchungen')
+      closeSheet()
+    }
+    window.addEventListener('voya:open-readiness', onOpenReadiness)
+    window.addEventListener('voya:open-reservations', onOpenReservations)
+    return () => {
+      window.removeEventListener('voya:open-readiness', onOpenReadiness)
+      window.removeEventListener('voya:open-reservations', onOpenReservations)
+    }
+  }, [tripId, setTrTab])
+
   const shell: MTripShellApi = {
     view, rtView, mapFront, toggleRtView, rtReach, setRtReach, mode, trTab, setTrTab, setTravelMode, toggleView, browseFromEdit,
     sheet, openSheet, closeSheet,
@@ -425,7 +463,7 @@ export default function MTripShell({
   const rtHeaderLabel = badgeLabel([rtHeaderDay, rtHeaderDistance])
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-[color:var(--m-bg)] bg-[image:var(--m-scr)] text-m-ink">
+    <div className="voya-mobile-trip fixed inset-0 z-50 overflow-hidden bg-[color:var(--m-bg)] bg-[image:var(--m-scr)] text-m-ink">
       {/* ── Content layers ─────────────────────────────────────────────── */}
       {/*
         One expression for both map tabs, and it has to stay one: written as two
@@ -470,7 +508,7 @@ export default function MTripShell({
 
       {/* ── Day chips (z-25 — covered by non-plan tab overlays, stays mounted) ── */}
       {days.length > 0 && (
-        <div className="absolute left-4 right-4 z-[25] flex gap-[6px] top-[calc(var(--m-safe-top,12px)+50px)]">
+        <div className="voya-day-rail absolute left-4 right-4 z-[25] flex gap-[6px] top-[calc(var(--m-safe-top,12px)+50px)]">
           <div className="flex flex-1 items-center gap-[2px] overflow-x-auto rounded-full border border-[color:var(--m-gbr)] bg-[color:var(--m-glass)] p-[3px] backdrop-blur-[24px] backdrop-saturate-[1.7]">
             {days.map((day, idx) => {
               const active = day.id === planner.selectedDayId
@@ -524,7 +562,7 @@ export default function MTripShell({
       )}
 
       {/* ── Top controls (z-42 — above every layer incl. tab overlays) ── */}
-      <div className="absolute left-4 right-4 z-[42] flex h-10 items-center justify-between top-[var(--m-safe-top,12px)]">
+      <div className="voya-trip-top-controls absolute left-4 right-4 z-[42] flex h-10 items-center justify-between top-[var(--m-safe-top,12px)]">
         <MIconBtn ariaLabel={t('common.back')} onClick={() => navigate('/dashboard')} className="backdrop-blur-[24px] backdrop-saturate-[1.7]">
           <ChevronLeft size={19} strokeWidth={2.2} />
         </MIconBtn>
@@ -707,13 +745,21 @@ export default function MTripShell({
             not move or change shape when the tab does. The two views stay separate
             states: coupling them would drag one tab into the other's half. */}
         {MAP_TABS.has(trTab) ? (
-          <MIconBtn
-            ariaLabel={mapFront ? t('mobileTrip.listView') : t('mobileTrip.mapView')}
-            onClick={trTab === 'roadtrip' ? toggleRtView : toggleView}
-            className="backdrop-blur-[24px] backdrop-saturate-[1.7]"
-          >
-            {mapFront ? <List size={18} strokeWidth={2} /> : <MapIcon size={18} strokeWidth={2} />}
-          </MIconBtn>
+          <div className="flex flex-none items-center gap-2">
+            {trTab === 'plan' && (
+              <>
+                <MVoyaReadinessButton tripId={tripId} onOpen={() => openSheet('readiness')} />
+                <VoyaTripHealthPanel tripId={tripId} mobile />
+              </>
+            )}
+            <MIconBtn
+              ariaLabel={mapFront ? t('mobileTrip.listView') : t('mobileTrip.mapView')}
+              onClick={trTab === 'roadtrip' ? toggleRtView : toggleView}
+              className="backdrop-blur-[24px] backdrop-saturate-[1.7]"
+            >
+              {mapFront ? <List size={18} strokeWidth={2} /> : <MapIcon size={18} strokeWidth={2} />}
+            </MIconBtn>
+          </div>
         ) : (
           <span className="w-[38px] flex-none" />
         )}
