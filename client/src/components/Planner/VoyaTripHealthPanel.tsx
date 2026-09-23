@@ -26,6 +26,9 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [repairingId, setRepairingId] = useState<string | null>(null)
+  const [safeRepairing, setSafeRepairing] = useState(false)
+  const [safeReviewOpen, setSafeReviewOpen] = useState(false)
+  const [safeRepairSummary, setSafeRepairSummary] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const load = async (silent = false) => {
@@ -94,6 +97,52 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
     () => data?.issues.filter(issue => issue.severity === 'High').length ?? 0,
     [data],
   )
+
+  const safeRepairActions = useMemo(() => {
+    if (!data) return []
+    const actions: Array<{ id: 'verify' | 'readiness'; title: string; detail: string }> = []
+    if (data.issues.some(issue => issue.category === 'Verification')) {
+      actions.push({
+        id: 'verify',
+        title: 'Verify Voya place suggestions',
+        detail: 'Match Voya-generated suggestions against TREK’s configured map providers. Ambiguous matches stay unresolved.',
+      })
+    }
+    if (data.issues.some(issue => issue.id === 'readiness-stale')) {
+      actions.push({
+        id: 'readiness',
+        title: 'Refresh Before You Go',
+        detail: 'Rebuild the readiness checklist from the current itinerary. This does not mark tasks done automatically.',
+      })
+    }
+    return actions
+  }, [data])
+
+  const runSafeRepairs = async () => {
+    if (safeRepairing || safeRepairActions.length === 0) return
+    setSafeRepairing(true)
+    setError('')
+    setSafeRepairSummary(null)
+    const completed: string[] = []
+    try {
+      if (safeRepairActions.some(action => action.id === 'verify')) {
+        const result = await voyaAiApi.verifyTrip({ tripId })
+        completed.push(`verified ${result.verified} place${result.verified === 1 ? '' : 's'}`)
+        window.dispatchEvent(new CustomEvent('voya:places-verified', { detail: { tripId } }))
+      }
+      if (safeRepairActions.some(action => action.id === 'readiness')) {
+        await voyaAiApi.refreshReadiness({ tripId })
+        completed.push('refreshed Before You Go')
+      }
+      await load(true)
+      setSafeReviewOpen(false)
+      setSafeRepairSummary(completed.length ? `Safe maintenance complete: ${completed.join(' · ')}.` : 'No safe maintenance action was needed.')
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Voya could not finish the safe repairs.'))
+    } finally {
+      setSafeRepairing(false)
+    }
+  }
 
   const scoreTone =
     (data?.score ?? 100) >= 90
@@ -184,16 +233,60 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
                       Voya only deducts points for concrete problems it can derive from stored itinerary, map-provider, reservation and readiness data.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    disabled={refreshing}
-                    onClick={() => { void load(true) }}
-                    className="inline-flex flex-none items-center gap-1.5 rounded-full border border-edge bg-surface-card px-3 py-1.5 text-caption font-medium text-content-secondary hover:bg-surface-hover disabled:opacity-50"
-                  >
-                    <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
-                    Refresh
-                  </button>
+                  <div className="flex flex-none flex-wrap items-center justify-end gap-2">
+                    {safeRepairActions.length > 0 && (
+                      <button
+                        type="button"
+                        disabled={safeRepairing}
+                        onClick={() => setSafeReviewOpen(value => !value)}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-[#377CF6] px-3 py-1.5 text-caption font-semibold text-white shadow-[0_7px_18px_rgba(55,124,246,.20)] hover:bg-[#286CE4] disabled:opacity-50"
+                      >
+                        <Sparkles size={12} />
+                        Review safe repairs
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={refreshing}
+                      onClick={() => { void load(true) }}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-surface-card px-3 py-1.5 text-caption font-medium text-content-secondary hover:bg-surface-hover disabled:opacity-50"
+                    >
+                      <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+                      Refresh
+                    </button>
+                  </div>
                 </div>
+
+                {safeReviewOpen && safeRepairActions.length > 0 && (
+                  <div className="mt-4 rounded-[18px] border border-[#9FC4F2]/25 bg-[#F4F9FF]/85 p-3.5 dark:border-white/8 dark:bg-white/4">
+                    <div className="text-[10px] font-bold uppercase tracking-[.12em] text-[#377CF6]">Safe maintenance only</div>
+                    <div className="mt-2 space-y-2">
+                      {safeRepairActions.map(action => (
+                        <div key={action.id} className="rounded-2xl border border-edge-faint bg-surface-card px-3 py-2.5">
+                          <div className="flex items-center gap-2 text-[11px] font-semibold text-content">
+                            <CheckCircle2 size={13} className="text-[#198754]" />
+                            {action.title}
+                          </div>
+                          <p className="mt-1 text-[10px] leading-relaxed text-content-muted">{action.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                      <p className="max-w-md text-[10px] leading-relaxed text-content-faint">
+                        Voya will not reorder days, remove stops, change bookings, or mark preparation tasks complete in this batch.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={safeRepairing}
+                        onClick={() => { void runSafeRepairs() }}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-[#377CF6] px-3.5 py-2 text-[11px] font-semibold text-white shadow-[0_8px_20px_rgba(55,124,246,.20)] disabled:opacity-60"
+                      >
+                        {safeRepairing && <RefreshCw size={11} className="animate-spin" />}
+                        {safeRepairing ? 'Repairing…' : 'Run safe repairs'}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
                   <Breakdown label="Verified" value={data.breakdown.verification} icon={MapPin} />
@@ -228,6 +321,12 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
                     onRepair={() => { void repairIssue(issue) }}
                   />
                 ))}
+              </div>
+            )}
+
+            {safeRepairSummary && (
+              <div className="mt-4 rounded-2xl border border-[#198754]/15 bg-[#198754]/6 px-3.5 py-2.5 text-[11px] font-medium text-[#198754]">
+                {safeRepairSummary}
               </div>
             )}
 
