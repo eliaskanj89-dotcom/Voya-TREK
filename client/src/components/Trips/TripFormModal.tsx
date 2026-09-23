@@ -496,6 +496,7 @@ export default function TripFormModal({ isOpen, onClose, onSave, trip, initialDe
             currency={formData.currency}
             travelers={1 + selectedMembers.length}
             reminderDays={formData.reminder_days}
+            autoExpand={!!initialDestination && !isEditing}
             onCreated={handleVoyaCreated}
           />
         )}
