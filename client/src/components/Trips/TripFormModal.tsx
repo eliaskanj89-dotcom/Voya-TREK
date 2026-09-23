@@ -12,7 +12,7 @@ import { useTranslation } from '../../i18n'
 import { CustomDatePicker } from '../shared/CustomDateTimePicker'
 import { normalizeImageFile } from '../../utils/convertHeic'
 import { getApiErrorMessage, type Trip } from '../../types'
-import { MAX_TRIP_DAYS, tripSpanDays, type TripCreateRequest } from '@trek/shared'
+import { MAX_TRIP_DAYS, tripSpanDays, type TripCreateRequest, type VoyaPlanDraftRequest } from '@trek/shared'
 import { NumericInput } from '../shared/NumericInput'
 import VoyaPlanComposer from './VoyaPlanComposer'
 import { currenciesWith, SYMBOLS } from '../Budget/BudgetPanel.constants'
@@ -28,6 +28,11 @@ interface TripFormModalProps {
   trip: Trip | null
   initialDestination?: string
   initialDayCount?: number
+  initialVoyaSeed?: {
+    budgetStyle?: VoyaPlanDraftRequest['budgetStyle']
+    interests?: string
+    notes?: string
+  }
   onCoverUpdate?: (tripId: number, coverUrl: string | null) => void
 }
 
@@ -40,7 +45,7 @@ interface CoverSearchPhoto {
   link?: string | null
 }
 
-export default function TripFormModal({ isOpen, onClose, onSave, trip, initialDestination, initialDayCount, onCoverUpdate }: TripFormModalProps) {
+export default function TripFormModal({ isOpen, onClose, onSave, trip, initialDestination, initialDayCount, initialVoyaSeed, onCoverUpdate }: TripFormModalProps) {
   const isEditing = !!trip
   const fileRef = useRef<HTMLInputElement>(null)
   const coverSearchSeq = useRef(0)
@@ -497,6 +502,9 @@ export default function TripFormModal({ isOpen, onClose, onSave, trip, initialDe
             travelers={1 + selectedMembers.length}
             reminderDays={formData.reminder_days}
             autoExpand={!!initialDestination && !isEditing}
+            initialBudgetStyle={initialVoyaSeed?.budgetStyle}
+            initialInterests={initialVoyaSeed?.interests}
+            initialNotes={initialVoyaSeed?.notes}
             onCreated={handleVoyaCreated}
           />
         )}
