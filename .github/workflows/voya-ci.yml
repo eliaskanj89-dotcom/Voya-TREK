@@ -40,4 +40,4 @@ jobs:
         run: npm run lint
 
       - name: Voya itinerary invariants
-        run: npm run test --workspace=server -- tests/unit/nest/voya-ai-multicity.test.ts tests/unit/nest/voya-ai-trip-edit.test.ts
+        run: npm run test --workspace=server -- tests/unit/nest/voya-ai-multicity.test.ts tests/unit/nest/voya-ai-trip-edit.test.ts tests/unit/nest/voya-ai-history.test.ts
