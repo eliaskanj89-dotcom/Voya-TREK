@@ -50,6 +50,22 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
     void load()
   }, [tripId])
 
+  useEffect(() => {
+    const refreshHealth = (event: Event) => {
+      const detail = (event as CustomEvent<{ tripId?: number }>).detail
+      if (detail?.tripId != null && detail.tripId !== tripId) return
+      void load(true)
+    }
+    window.addEventListener('voya:enrichment-complete', refreshHealth)
+    window.addEventListener('voya:readiness-updated', refreshHealth)
+    window.addEventListener('voya:trip-health-updated', refreshHealth)
+    return () => {
+      window.removeEventListener('voya:enrichment-complete', refreshHealth)
+      window.removeEventListener('voya:readiness-updated', refreshHealth)
+      window.removeEventListener('voya:trip-health-updated', refreshHealth)
+    }
+  }, [tripId])
+
   const repairIssue = async (issue: VoyaTripHealthIssue) => {
     if (repairingId) return
     setRepairingId(issue.id)
@@ -133,6 +149,7 @@ export default function VoyaTripHealthPanel({ tripId, mobile = false }: VoyaTrip
       if (safeRepairActions.some(action => action.id === 'readiness')) {
         await voyaAiApi.refreshReadiness({ tripId })
         completed.push('refreshed Before You Go')
+        window.dispatchEvent(new CustomEvent('voya:readiness-updated', { detail: { tripId } }))
       }
       await load(true)
       setSafeReviewOpen(false)
