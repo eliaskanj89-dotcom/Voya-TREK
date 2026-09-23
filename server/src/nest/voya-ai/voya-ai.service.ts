@@ -12,10 +12,13 @@ import {
   type VoyaTravelerDna,
   type VoyaTripEditRequest,
   type VoyaGeneratedReadinessItem,
+  type VoyaDestinationDiscoveryRequest,
+  type VoyaDestinationDiscoveryResult,
   type VoyaReadinessBuildRequest,
   type VoyaReadinessResult,
   type VoyaReadinessStatusRequest,
   voyaGeneratedReadinessItemSchema,
+  voyaDestinationDiscoveryResultSchema,
   voyaDayEditDraftSchema,
   voyaPlanDraftResponseSchema,
   voyaTravelerDnaSchema,
@@ -39,6 +42,7 @@ const generatedTripEditPlanSchema = voyaTripEditPlanSchema.omit({ tripId: true, 
 const generatedReadinessSchema = z.object({
   items: z.array(voyaGeneratedReadinessItemSchema).max(12),
 });
+const generatedDestinationDiscoverySchema = voyaDestinationDiscoveryResultSchema.omit({ generatedBy: true });
 
 export class VoyaAiUnavailableError extends Error {
   constructor() {
@@ -74,6 +78,63 @@ export class VoyaAiService {
     private readonly maps: MapsService,
     private readonly settings: SettingsService,
   ) {}
+
+  async discoverDestinations(
+    user: User,
+    request: VoyaDestinationDiscoveryRequest,
+  ): Promise<VoyaDestinationDiscoveryResult> {
+    const config = this.configResolver.resolve(user.id);
+    if (!config) throw new VoyaAiUnavailableError();
+    const travelerDna = this.travelerDna(user.id);
+
+    let repair = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const raw = await this.generator.generate(config, {
+        system: DESTINATION_DISCOVERY_SYSTEM_PROMPT,
+        user: [
+          `Trip length: ${request.days} days.`,
+          `Budget style: ${request.budgetStyle}. Climate preference: ${request.climate}. Travel style: ${request.travelStyle}.`,
+          request.month ? `Travel month: ${request.month}.` : 'Travel month is flexible.',
+          `Travel effort appetite: ${request.travelEffort}.`,
+          request.interests.length ? `Current interests: ${request.interests.join(', ')}.` : '',
+          request.notes ? `Traveler notes: ${request.notes}` : '',
+          this.travelerDnaPrompt(travelerDna),
+          'Return 6-8 DISTINCT real geographic destinations. Do not repeat the same metro area, island group, or near-identical destination under different names.',
+          'Fit suggestions to the requested trip length: avoid sprawling multi-region countries when the traveler only has a few days unless you name a specific city or region.',
+          'budgetBand is a qualitative positioning only. Never provide exact costs, flight prices, hotel rates, or numeric budgets.',
+          'climateNote is a broad typical-climate fit, not a weather forecast. Do not state guaranteed temperatures or current conditions.',
+          'Do not mention visa ease, entry rules, passport rules, current safety levels, political stability, live events, live availability, or current transport schedules.',
+          'highlights must be broad well-known place themes or attractions, not claims about current opening status.',
+          'tradeoffs should be practical planning tradeoffs such as distance between areas, crowds in broad terms, or a slower pace needed for geography; avoid current-event claims.',
+          'searchTerm should be the canonical destination string a trip planner can reuse.',
+          repair ? `Previous result failed validation. Fix: ${repair}` : '',
+        ].filter(Boolean).join('\n'),
+        jsonSchema: z.toJSONSchema(generatedDestinationDiscoverySchema),
+      });
+
+      try {
+        const parsed = generatedDestinationDiscoverySchema.parse(raw);
+        const seen = new Set<string>();
+        for (const suggestion of parsed.suggestions) {
+          const key = `${canonicalPlaceName(suggestion.name)}|${canonicalPlaceName(suggestion.country)}`;
+          if (seen.has(key)) throw new VoyaAiInvalidDraftError(`Duplicate destination: ${suggestion.name}`);
+          seen.add(key);
+        }
+        return {
+          ...parsed,
+          generatedBy: { provider: config.provider, model: config.model },
+        };
+      } catch (error) {
+        if (attempt === 1) {
+          const detail = error instanceof Error ? error.message : 'unknown validation error';
+          throw new VoyaAiInvalidDraftError(`Voya could not produce safe destination ideas: ${detail}`);
+        }
+        repair = this.validationMessage(error);
+      }
+    }
+
+    throw new VoyaAiInvalidDraftError('Voya could not produce destination ideas');
+  }
 
   async planDraft(userId: number, request: VoyaPlanDraftRequest): Promise<VoyaPlanDraftResponse> {
     const config = this.configResolver.resolve(userId);
@@ -1158,3 +1219,12 @@ function readinessResult(
     })),
   };
 }
+
+
+const DESTINATION_DISCOVERY_SYSTEM_PROMPT = `You are Voya's destination discovery engine.
+Suggest only real geographic travel destinations that you are confident exist.
+Personalize recommendations using the traveler's stated request and Traveler DNA.
+Be inspiring but factual. This is not a live-search call.
+Never invent current prices, visa or entry rules, live safety claims, current events, opening hours, live weather, flight duration, or availability.
+Use qualitative budget and climate language only.
+Return only the requested structured discovery result.`;
