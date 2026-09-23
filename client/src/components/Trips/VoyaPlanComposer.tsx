@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Check, MapPin, Sparkles } from 'lucide-react'
 import type { Trip, VoyaPlanDraftRequest, VoyaPlanDraftResponse } from '@trek/shared'
 import { tripSpanDays } from '@trek/shared'
 import { voyaAiApi } from '../../api/client'
 import { getApiErrorMessage } from '../../types'
+import { useSettingsStore } from '../../store/settingsStore'
 
 interface VoyaPlanComposerProps {
   initialDestination: string
@@ -26,10 +27,11 @@ export default function VoyaPlanComposer({
   reminderDays,
   onCreated,
 }: VoyaPlanComposerProps) {
+  const travelerDna = useSettingsStore(state => state.settings.voya_traveler_dna)
   const [expanded, setExpanded] = useState(false)
   const [destination, setDestination] = useState(initialDestination)
-  const [pace, setPace] = useState<VoyaPlanDraftRequest['pace']>('balanced')
-  const [budgetStyle, setBudgetStyle] = useState<VoyaPlanDraftRequest['budgetStyle']>('moderate')
+  const [pace, setPace] = useState<VoyaPlanDraftRequest['pace']>(travelerDna?.pace ?? 'balanced')
+  const [budgetStyle, setBudgetStyle] = useState<VoyaPlanDraftRequest['budgetStyle']>(travelerDna?.budgetStyle ?? 'moderate')
   const [interests, setInterests] = useState('')
   const [notes, setNotes] = useState('')
   const [draft, setDraft] = useState<VoyaPlanDraftResponse | null>(null)
@@ -37,6 +39,12 @@ export default function VoyaPlanComposer({
   const [generating, setGenerating] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (expanded || draft) return
+    setPace(travelerDna?.pace ?? 'balanced')
+    setBudgetStyle(travelerDna?.budgetStyle ?? 'moderate')
+  }, [travelerDna?.pace, travelerDna?.budgetStyle, expanded, draft])
 
   const days = useMemo(() => {
     if (startDate && endDate) return tripSpanDays(startDate, endDate)
