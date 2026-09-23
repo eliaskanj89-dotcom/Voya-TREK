@@ -1592,3 +1592,120 @@ img[alt="TREK"] {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 .trek-range::-moz-range-track { height: 5px; border-radius: 999px; background: transparent; }
+
+
+/* ── Voya product identity layer ───────────────────────────────────────────
+   TREK remains the functional foundation. These overrides establish Voya's
+   cool-white, ice-blue liquid-glass visual language without changing planner
+   behaviour or data contracts. */
+:root {
+  --font-system: 'Inter', 'Poppins', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font-subtext: 'Inter', 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-voya-display: 'Playfair Display', Georgia, serif;
+
+  --bg-primary: #F8FBFF;
+  --bg-secondary: #F4F8FD;
+  --bg-tertiary: #EAF2FC;
+  --bg-elevated: rgba(255,255,255,.84);
+  --bg-card: rgba(255,255,255,.94);
+  --bg-input: rgba(255,255,255,.9);
+  --bg-hover: rgba(55,124,246,.055);
+  --bg-selected: #E8F1FF;
+
+  --text-primary: #10131A;
+  --text-secondary: #334A65;
+  --text-muted: #68788C;
+  --text-faint: #94A2B4;
+
+  --border-primary: rgba(112,145,184,.20);
+  --border-secondary: rgba(112,145,184,.12);
+  --border-faint: rgba(112,145,184,.10);
+
+  --accent: #377CF6;
+  --accent-text: #FFFFFF;
+  --accent-on: #377CF6;
+  --accent-hover: #286CE4;
+  --accent-subtle: #EAF2FF;
+
+  --sidebar-bg: rgba(248,251,255,.80);
+  --sidebar-shadow: 0 20px 55px rgba(31,67,112,.10);
+  --shadow-card: 0 14px 38px rgba(31,67,112,.075);
+  --shadow-elevated: 0 22px 60px rgba(31,67,112,.12);
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+}
+
+html:not(.dark) body {
+  background:
+    radial-gradient(circle at 18% -8%, rgba(196,222,255,.50), transparent 30%),
+    radial-gradient(circle at 88% 8%, rgba(225,239,255,.62), transparent 25%),
+    #F8FBFF;
+  color: #10131A;
+}
+
+html.dark {
+  --bg-primary: #07111F;
+  --bg-secondary: #0B1728;
+  --bg-tertiary: #102038;
+  --bg-elevated: rgba(11,23,40,.86);
+  --bg-card: rgba(12,27,47,.94);
+  --bg-input: rgba(14,31,53,.92);
+  --bg-hover: rgba(121,174,255,.09);
+  --bg-selected: #132C50;
+  --text-primary: #F7FAFF;
+  --text-secondary: #D7E5F7;
+  --text-muted: #9FB1C7;
+  --text-faint: #7388A2;
+  --border-primary: rgba(174,205,244,.16);
+  --border-secondary: rgba(174,205,244,.10);
+  --border-faint: rgba(174,205,244,.08);
+  --accent: #79AEFF;
+  --accent-text: #07111F;
+  --accent-on: #79AEFF;
+  --accent-hover: #94BEFF;
+  --accent-subtle: rgba(121,174,255,.12);
+  --sidebar-bg: rgba(7,17,31,.78);
+}
+
+.voya-wordmark {
+  font-family: var(--font-voya-display);
+  font-weight: 600;
+  letter-spacing: -.045em;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.voya-glass {
+  background: linear-gradient(145deg, rgba(255,255,255,.88), rgba(237,246,255,.70));
+  border: 1px solid rgba(255,255,255,.92);
+  box-shadow: 0 18px 55px rgba(31,67,112,.12), inset 0 1px 0 rgba(255,255,255,.98);
+  backdrop-filter: blur(28px) saturate(165%);
+  -webkit-backdrop-filter: blur(28px) saturate(165%);
+}
+
+.dark .voya-glass {
+  background: linear-gradient(145deg, rgba(16,35,59,.88), rgba(8,22,39,.72));
+  border-color: rgba(255,255,255,.10);
+  box-shadow: 0 22px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.07);
+}
+
+.voya-editorial {
+  font-family: var(--font-voya-display);
+  letter-spacing: -.035em;
+}
+
+button, a, [role="button"] {
+  transition-timing-function: cubic-bezier(.16,1,.3,1);
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 20px !important;
+  box-shadow: 0 18px 48px rgba(31,67,112,.16) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voya-glass { backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+}
