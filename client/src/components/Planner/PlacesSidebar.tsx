@@ -33,7 +33,7 @@ const PlacesSidebar = React.memo(function PlacesSidebar(props: PlacesSidebarProp
   const { locale } = useTranslation()
   const loadTrip = useTripStore((s) => s.loadTrip)
   const [voyaVerifyBusy, setVoyaVerifyBusy] = React.useState(false)
-  const [voyaVerifySummary, setVoyaVerifySummary] = React.useState<{ verified: number; unresolved: number } | null>(null)
+  const [voyaVerifySummary, setVoyaVerifySummary] = React.useState<{ verified: number; unresolved: number; optimizedDays: number } | null>(null)
   const voyaSuggestionCount = props.places.filter(place =>
     /Suggested by Voya — verify current details before relying on them\./i.test(place.notes || '')
   ).length
@@ -43,10 +43,10 @@ const PlacesSidebar = React.memo(function PlacesSidebar(props: PlacesSidebarProp
     setVoyaVerifyBusy(true)
     try {
       const result = await voyaAiApi.verifyTrip({ tripId })
-      setVoyaVerifySummary({ verified: result.verified, unresolved: result.unresolved })
+      setVoyaVerifySummary({ verified: result.verified, unresolved: result.unresolved, optimizedDays: result.optimizedDays })
       await loadTrip(tripId)
       if (result.verified > 0) {
-        toast.success(`Voya matched ${result.verified} suggestion${result.verified === 1 ? '' : 's'} to real map records.`)
+        toast.success(`Voya matched ${result.verified} suggestion${result.verified === 1 ? '' : 's'} to real map records${result.optimizedDays > 0 ? ` and optimized ${result.optimizedDays} day${result.optimizedDays === 1 ? '' : 's'}` : ''}.`)
       } else {
         toast.warning('Voya could not confidently match these suggestions yet.')
       }
@@ -93,6 +93,7 @@ const PlacesSidebar = React.memo(function PlacesSidebar(props: PlacesSidebarProp
                   {voyaVerifySummary.verified} matched
                   <span className="mx-1.5 text-content-faint">·</span>
                   {voyaVerifySummary.unresolved} unresolved
+                  {voyaVerifySummary.optimizedDays > 0 && <><span className="mx-1.5 text-content-faint">·</span>{voyaVerifySummary.optimizedDays} day{voyaVerifySummary.optimizedDays === 1 ? '' : 's'} optimized</>}
                 </div>
               )}
             </div>
