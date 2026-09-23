@@ -17,6 +17,9 @@ import {
   type VoyaTripEditPlan,
   type VoyaTravelerDna,
   type VoyaTripEditRequest,
+  type VoyaTripHealthRequest,
+  type VoyaTripHealthResult,
+  type VoyaTripHealthIssue,
   type VoyaGeneratedReadinessItem,
   type VoyaDestinationDiscoveryRequest,
   type VoyaDestinationDiscoveryResult,
@@ -480,6 +483,294 @@ export class VoyaAiService {
         },
       };
     });
+  }
+
+  getTripHealth(user: User, request: VoyaTripHealthRequest): VoyaTripHealthResult {
+    this.assertTripAccess(request.tripId, user.id);
+
+    const tripId = request.tripId;
+    const dayRows = this.days.list(tripId).days as any[];
+    const readiness = this.getReadiness(user, { tripId });
+    const issues: VoyaTripHealthIssue[] = [];
+
+    let assignedStops = 0;
+    let verifiedStops = 0;
+    let unresolvedSuggestions = 0;
+    let overloadedDays = 0;
+    let overlapDays = 0;
+    let inefficientRouteDays = 0;
+
+    let verificationPenalty = 0;
+    let schedulePenalty = 0;
+    let routePenalty = 0;
+    let readinessPenalty = 0;
+    let reservationPenalty = 0;
+
+    const reservationRows = this.db.all<{
+      id: number;
+      title: string;
+      status: string | null;
+      needs_review: number | null;
+      day_id: number | null;
+      place_id: number | null;
+    }>(
+      'SELECT id, title, status, needs_review, day_id, place_id FROM reservations WHERE trip_id = ?',
+      tripId,
+    );
+
+    const reviewedReservationPlaceIds = new Set(
+      reservationRows
+        .filter(row => !row.needs_review)
+        .map(row => row.place_id)
+        .filter((id): id is number => typeof id === 'number' && Number.isFinite(id)),
+    );
+    const reviewedReservationTitles = new Set(
+      reservationRows
+        .filter(row => !row.needs_review)
+        .map(row => canonicalPlaceName(row.title || ''))
+        .filter(Boolean),
+    );
+
+    const reservationsNeedingReview = reservationRows.filter(row => !!row.needs_review).length;
+    if (reservationsNeedingReview > 0) {
+      const deduction = Math.min(12, reservationsNeedingReview * 4);
+      reservationPenalty += deduction;
+      issues.push({
+        id: 'reservation-needs-review',
+        category: 'Reservation',
+        severity: reservationsNeedingReview >= 3 ? 'High' : 'Medium',
+        title: reservationsNeedingReview === 1 ? '1 reservation still needs review' : `${reservationsNeedingReview} reservations still need review`,
+        reason: 'TREK has imported reservation records that are explicitly marked for review before they should be relied on.',
+        actionLabel: 'Review reservations',
+        deduction,
+      });
+    }
+
+    for (const day of dayRows) {
+      const assignments = Array.isArray(day.assignments) ? day.assignments : [];
+      const normalStops = assignments.filter((assignment: any) => assignment?.accommodation_id == null);
+      assignedStops += normalStops.length;
+
+      let dayUnresolved = 0;
+      for (const assignment of normalStops) {
+        const place = assignment?.place || {};
+        const providerId = place.google_place_id || place.osm_id || place.amap_poi_id || place.google_ftid;
+        if (providerId) verifiedStops++;
+
+        const suggested = isVoyaSuggestion(place.notes);
+        if (suggested && !providerId) {
+          unresolvedSuggestions++;
+          dayUnresolved++;
+        }
+
+        const reservationCheckSuggested = /Reservation may be worth checking\./i.test(place.notes || '');
+        const normalizedName = canonicalPlaceName(place.name || '');
+        const hasReservation =
+          (typeof place.id === 'number' && reviewedReservationPlaceIds.has(place.id)) ||
+          (!!normalizedName && reviewedReservationTitles.has(normalizedName));
+
+        if (reservationCheckSuggested && !hasReservation) {
+          const deduction = 3;
+          reservationPenalty += deduction;
+          issues.push({
+            id: `reservation-check-${day.id}-${place.id || assignment.id}`,
+            category: 'Reservation',
+            severity: 'Medium',
+            title: `Check whether ${place.name || 'this stop'} needs a reservation`,
+            reason: 'This Voya suggestion was explicitly flagged as worth checking, and no reviewed reservation is linked to it yet.',
+            actionLabel: 'Check reservation',
+            dayId: day.id,
+            placeId: typeof place.id === 'number' ? place.id : undefined,
+            deduction,
+          });
+        }
+      }
+
+      if (dayUnresolved > 0) {
+        const deduction = Math.min(8, dayUnresolved * 2);
+        verificationPenalty += deduction;
+        issues.push({
+          id: `verification-day-${day.id}`,
+          category: 'Verification',
+          severity: dayUnresolved >= 3 ? 'High' : 'Medium',
+          title: dayUnresolved === 1
+            ? `1 Voya suggestion on Day ${day.day_number ?? ''} is still unresolved`.trim()
+            : `${dayUnresolved} Voya suggestions on Day ${day.day_number ?? ''} are still unresolved`.trim(),
+          reason: 'These stops do not yet carry a matched map-provider identity, so location details and routing should not be treated as verified.',
+          actionLabel: 'Verify places',
+          dayId: day.id,
+          deduction,
+        });
+      }
+
+      if (normalStops.length >= 8) {
+        overloadedDays++;
+        const deduction = normalStops.length >= 10 ? 10 : 6;
+        schedulePenalty += deduction;
+        issues.push({
+          id: `overloaded-day-${day.id}`,
+          category: 'Schedule',
+          severity: normalStops.length >= 10 ? 'High' : 'Medium',
+          title: `Day ${day.day_number ?? ''} is carrying ${normalStops.length} planned stops`.trim(),
+          reason: 'A high stop count leaves less room for travel time, queues, meals and normal delays even before route time is added.',
+          actionLabel: 'Relax this day',
+          dayId: day.id,
+          deduction,
+        });
+      }
+
+      const timed = normalStops
+        .map((assignment: any) => {
+          const place = assignment?.place || {};
+          const start = healthTimeMinutes(place.place_time);
+          const end = healthTimeMinutes(place.end_time);
+          const duration = Number.isFinite(Number(place.duration_minutes)) ? Number(place.duration_minutes) : null;
+          return {
+            assignment,
+            place,
+            start,
+            end: end ?? (start != null && duration != null ? start + Math.max(0, duration) : null),
+          };
+        })
+        .filter((item: any) => item.start != null)
+        .sort((a: any, b: any) => a.start - b.start);
+
+      let overlaps = 0;
+      for (let i = 0; i < timed.length - 1; i++) {
+        const current = timed[i];
+        const next = timed[i + 1];
+        if (current.end != null && current.end > next.start) overlaps++;
+      }
+      if (overlaps > 0) {
+        overlapDays++;
+        const deduction = Math.min(10, 5 + (overlaps - 1) * 2);
+        schedulePenalty += deduction;
+        issues.push({
+          id: `overlap-day-${day.id}`,
+          category: 'Schedule',
+          severity: overlaps >= 2 ? 'High' : 'Medium',
+          title: `Day ${day.day_number ?? ''} has overlapping timed stops`.trim(),
+          reason: overlaps === 1
+            ? 'At least one activity is scheduled to run into the next timed stop.'
+            : `${overlaps} timing conflicts are present in this day.`,
+          actionLabel: 'Fix timing',
+          dayId: day.id,
+          deduction,
+        });
+      }
+
+      const routed = normalStops
+        .map((assignment: any) => {
+          const place = assignment?.place || {};
+          return {
+            id: assignment.id,
+            lat: Number(place.lat),
+            lng: Number(place.lng),
+            name: String(place.name || ''),
+          };
+        })
+        .filter((point: any) =>
+          Number.isFinite(point.lat) && Number.isFinite(point.lng) && point.lat !== 0 && point.lng !== 0
+        );
+
+      if (routed.length >= 4) {
+        const optimized = optimizeRoute(routed);
+        const currentLength = healthRouteLength(routed);
+        const optimizedLength = healthRouteLength(optimized);
+        const improvement = currentLength > 0 ? (currentLength - optimizedLength) / currentLength : 0;
+
+        if (improvement >= 0.18 && !sameHealthOrder(routed, optimized)) {
+          inefficientRouteDays++;
+          const deduction = improvement >= 0.35 ? 8 : 5;
+          routePenalty += deduction;
+          issues.push({
+            id: `route-day-${day.id}`,
+            category: 'Route',
+            severity: improvement >= 0.35 ? 'High' : 'Medium',
+            title: `Day ${day.day_number ?? ''} is backtracking more than necessary`.trim(),
+            reason: `TREK’s coordinate-based optimizer finds a route order roughly ${Math.round(improvement * 100)}% shorter by straight-line path length.`,
+            actionLabel: 'Optimize route',
+            dayId: day.id,
+            deduction,
+          });
+        }
+      }
+    }
+
+    if (unresolvedSuggestions > 0 && verificationPenalty === 0) {
+      verificationPenalty = Math.min(15, unresolvedSuggestions * 2);
+    }
+
+    const openHighReadiness = readiness.items.filter(item => item.status === 'To do' && item.priority === 'High').length;
+    const openMediumReadiness = readiness.items.filter(item => item.status === 'To do' && item.priority === 'Medium').length;
+    if (readiness.stale) {
+      readinessPenalty += 4;
+      issues.push({
+        id: 'readiness-stale',
+        category: 'Readiness',
+        severity: 'Low',
+        title: 'Before You Go is out of date',
+        reason: 'The itinerary changed after the readiness checklist was generated.',
+        actionLabel: 'Refresh readiness',
+        deduction: 4,
+      });
+    }
+    if (openHighReadiness > 0) {
+      const deduction = Math.min(15, openHighReadiness * 5);
+      readinessPenalty += deduction;
+      issues.push({
+        id: 'readiness-high-open',
+        category: 'Readiness',
+        severity: 'High',
+        title: openHighReadiness === 1 ? '1 high-priority readiness item is still open' : `${openHighReadiness} high-priority readiness items are still open`,
+        reason: 'These are the trip-preparation items Voya currently considers capable of materially disrupting the plan if left unresolved.',
+        actionLabel: 'Open Before You Go',
+        deduction,
+      });
+    }
+    if (openMediumReadiness > 0) {
+      const deduction = Math.min(8, openMediumReadiness * 2);
+      readinessPenalty += deduction;
+    }
+
+    verificationPenalty = Math.min(25, verificationPenalty);
+    schedulePenalty = Math.min(25, schedulePenalty);
+    routePenalty = Math.min(20, routePenalty);
+    readinessPenalty = Math.min(20, readinessPenalty);
+    reservationPenalty = Math.min(20, reservationPenalty);
+
+    const totalPenalty = verificationPenalty + schedulePenalty + routePenalty + readinessPenalty + reservationPenalty;
+    const score = Math.max(0, 100 - totalPenalty);
+
+    const sortedIssues = issues
+      .sort((a, b) => healthSeverityRank(a.severity) - healthSeverityRank(b.severity) || b.deduction - a.deduction)
+      .slice(0, 30);
+
+    return {
+      tripId,
+      score,
+      label: score >= 90 ? 'Excellent' : score >= 75 ? 'Strong' : score >= 55 ? 'Needs attention' : 'At risk',
+      checkedAt: new Date().toISOString(),
+      breakdown: {
+        verification: Math.max(0, 100 - verificationPenalty * 4),
+        schedule: Math.max(0, 100 - schedulePenalty * 4),
+        route: Math.max(0, 100 - routePenalty * 5),
+        readiness: Math.max(0, 100 - readinessPenalty * 5),
+        reservation: Math.max(0, 100 - reservationPenalty * 5),
+      },
+      metrics: {
+        daysChecked: dayRows.length,
+        assignedStops,
+        verifiedStops,
+        unresolvedSuggestions,
+        overloadedDays,
+        overlapDays,
+        inefficientRouteDays,
+        openHighReadiness,
+        reservationsNeedingReview,
+      },
+      issues: sortedIssues,
+    };
   }
 
   getReadiness(user: User, request: VoyaReadinessBuildRequest): VoyaReadinessResult {
@@ -2411,4 +2702,40 @@ function isVoyaManagedPlace(notes: string | null | undefined): boolean {
   const value = notes || '';
   return /Suggested by Voya — verify current details before relying on them\./i.test(value)
     || /Matched by Voya to a .* place record on /i.test(value);
+}
+
+
+function healthTimeMinutes(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function healthRouteLength(points: Array<{ lat: number; lng: number }>): number {
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    const latScale = Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180);
+    const dx = (a.lng - b.lng) * latScale;
+    const dy = a.lat - b.lat;
+    total += Math.sqrt(dx * dx + dy * dy);
+  }
+  return total;
+}
+
+function sameHealthOrder(
+  current: Array<{ id: number }>,
+  optimized: Array<{ id: number }>,
+): boolean {
+  if (current.length !== optimized.length) return false;
+  return current.every((point, index) => point.id === optimized[index]?.id);
+}
+
+function healthSeverityRank(value: 'High' | 'Medium' | 'Low'): number {
+  return value === 'High' ? 0 : value === 'Medium' ? 1 : 2;
 }
