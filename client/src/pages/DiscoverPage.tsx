@@ -106,7 +106,19 @@ export default function DiscoverPage() {
       create: '1',
       destination: destination.searchTerm || `${destination.name}, ${destination.country}`,
       days: String(days),
+      budgetStyle,
+      travelStyle,
+      climate,
+      travelEffort,
     })
+    const interestBrief = interests
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean)
+      .slice(0, 10)
+      .join(', ')
+    if (interestBrief) params.set('interests', interestBrief)
+    if (notes.trim()) params.set('notes', notes.trim())
     navigate(`/dashboard?${params.toString()}`)
   }
 
