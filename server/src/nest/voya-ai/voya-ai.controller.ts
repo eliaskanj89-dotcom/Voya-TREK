@@ -3,7 +3,7 @@ import type { User } from '../../types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StructuredGenerationError } from './structured-generation.service';
-import { VoyaApplyDayEditDto, VoyaDayEditDto, VoyaMaterializeDraftDto, VoyaMaterializeMultiCityDraftDto, VoyaMultiCityPlanDto, VoyaPlanDraftDto, VoyaTripEditDto, VoyaVerifyTripDto, VoyaReadinessBuildDto, VoyaReadinessStatusDto, VoyaDestinationDiscoveryDto } from './voya-ai.dto';
+import { VoyaApplyDayEditDto, VoyaDayEditDto, VoyaEditHistoryDto, VoyaMaterializeDraftDto, VoyaMaterializeMultiCityDraftDto, VoyaMultiCityPlanDto, VoyaPlanDraftDto, VoyaRestoreEditSnapshotDto, VoyaTripEditDto, VoyaVerifyTripDto, VoyaReadinessBuildDto, VoyaReadinessStatusDto, VoyaDestinationDiscoveryDto } from './voya-ai.dto';
 import {
   VoyaAiInvalidDraftError,
   VoyaAiPermissionError,
@@ -129,6 +129,34 @@ export class VoyaAiController {
       }
       console.error('Voya AI materialization failed:', error instanceof Error ? error.message : 'unknown error');
       throw new HttpException({ error: 'Voya could not create this trip', code: 'VOYA_AI_MATERIALIZE_ERROR' }, 500);
+    }
+  }
+
+  @Post('edit-history')
+  editHistory(@CurrentUser() user: User, @Body() body: VoyaEditHistoryDto) {
+    try {
+      return this.voya.listEditHistory(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      throw new HttpException({ error: 'Voya could not load edit history', code: 'VOYA_HISTORY_ERROR' }, 500);
+    }
+  }
+
+  @Post('restore-edit-snapshot')
+  restoreEditSnapshot(@CurrentUser() user: User, @Body() body: VoyaRestoreEditSnapshotDto) {
+    try {
+      return this.voya.restoreEditSnapshot(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_HISTORY_RESTORE_CONFLICT' }, 409);
+      }
+      console.error('Voya edit history restore failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not restore this version', code: 'VOYA_HISTORY_RESTORE_ERROR' }, 500);
     }
   }
 
