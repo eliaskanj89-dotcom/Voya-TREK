@@ -12,6 +12,7 @@ import { getApiErrorMessage } from '../types'
 import { useIsPhone } from '../mobile/useIsPhone'
 import MGlassBar from '../mobile/components/MGlassBar'
 import MIconBtn from '../mobile/components/MIconBtn'
+import { useDestinationVisual } from '../hooks/useDestinationVisual'
 
 const MONTHS = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -368,39 +369,94 @@ function DestinationCard({
   onCompare: () => void
   onPlan: () => void
 }) {
+  const { visual, loading: visualLoading } = useDestinationVisual(
+    suggestion.name,
+    suggestion.country,
+    suggestion.searchTerm,
+  )
+
   return (
     <article
       className="group flex min-h-[500px] flex-col overflow-hidden rounded-[28px] border border-[#BDD5F4]/42 shadow-[0_20px_54px_rgba(31,67,112,.09)] transition-all hover:-translate-y-1 hover:shadow-[0_28px_68px_rgba(31,67,112,.14)] dark:border-white/9"
       style={{ background: CARD_WASHES[index % CARD_WASHES.length] }}
     >
-      <div className="relative min-h-[150px] overflow-hidden border-b border-[#9FC3EF]/13 px-5 pb-5 pt-6">
-        <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full border-[26px] border-[#377CF6]/7" />
-        <div className="absolute -bottom-12 right-16 h-28 w-28 rounded-full bg-[#377CF6]/6 blur-2xl" />
-        <div className="relative">
+      <div className="relative min-h-[230px] overflow-hidden border-b border-[#9FC3EF]/13">
+        {visual ? (
+          <>
+            <img
+              src={visual.url}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.035]"
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,20,39,.12)_0%,rgba(6,20,39,.28)_44%,rgba(6,20,39,.78)_100%)]" />
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-0" style={{ background: CARD_WASHES[index % CARD_WASHES.length] }} />
+            <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full border-[26px] border-[#377CF6]/7" />
+            <div className="absolute -bottom-12 right-16 h-28 w-28 rounded-full bg-[#377CF6]/6 blur-2xl" />
+            {visualLoading && (
+              <div className="absolute inset-0 animate-pulse bg-[linear-gradient(100deg,transparent_20%,rgba(255,255,255,.48)_44%,transparent_68%)] bg-[length:220%_100%]" />
+            )}
+          </>
+        )}
+
+        <div className="relative z-10 flex min-h-[230px] flex-col justify-between p-5">
           <div className="flex items-center justify-between gap-3">
-            <span className="rounded-full border border-[#377CF6]/16 bg-white/58 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.11em] text-[#377CF6]">
+            <span className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.11em] backdrop-blur-xl ${
+              visual
+                ? 'border-white/25 bg-black/20 text-white'
+                : 'border-[#377CF6]/16 bg-white/58 text-[#377CF6]'
+            }`}>
               {suggestion.type}
             </span>
             <button
               type="button"
               onClick={onCompare}
               disabled={!compared && compareFull}
-              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-35 ${
-                compared ? 'bg-[#377CF6] text-white' : 'border border-[#377CF6]/16 bg-white/48 text-[#377CF6]'
+              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold backdrop-blur-xl transition-all disabled:cursor-not-allowed disabled:opacity-35 ${
+                compared
+                  ? 'bg-[#377CF6] text-white'
+                  : visual
+                    ? 'border border-white/25 bg-black/20 text-white hover:bg-black/30'
+                    : 'border border-[#377CF6]/16 bg-white/48 text-[#377CF6]'
               }`}
             >
               {compared && <Check size={10} strokeWidth={3} />}
               {compared ? 'Comparing' : 'Compare'}
             </button>
           </div>
-          <h3 className="voya-editorial mt-5 text-[36px] font-medium leading-[.95] tracking-[-.055em] text-content">{suggestion.name}</h3>
-          <p className="mt-1 text-[12px] font-medium text-content-muted">{suggestion.country}</p>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {suggestion.vibe.slice(0, 4).map(vibe => (
-              <span key={vibe} className="rounded-full bg-white/58 px-2.5 py-1 text-[9px] font-medium text-content-muted">{vibe}</span>
-            ))}
+
+          <div>
+            <h3 className={`voya-editorial text-[38px] font-medium leading-[.93] tracking-[-.06em] ${visual ? 'text-white drop-shadow-[0_2px_18px_rgba(0,0,0,.32)]' : 'text-content'}`}>
+              {suggestion.name}
+            </h3>
+            <p className={`mt-1 text-[12px] font-medium ${visual ? 'text-white/78' : 'text-content-muted'}`}>
+              {suggestion.country}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {suggestion.vibe.slice(0, 4).map(vibe => (
+                <span
+                  key={vibe}
+                  className={`rounded-full px-2.5 py-1 text-[9px] font-medium backdrop-blur-xl ${
+                    visual ? 'border border-white/15 bg-black/18 text-white/88' : 'bg-white/58 text-content-muted'
+                  }`}
+                >
+                  {vibe}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
+
+        {visual && (
+          <div className="absolute bottom-2 right-2 z-20 max-w-[72%] truncate rounded-full bg-black/30 px-2 py-1 text-[8px] font-medium text-white/72 backdrop-blur-xl">
+            {visual.source === 'google'
+              ? 'Google photo'
+              : [visual.source === 'wikimedia' ? 'Wikimedia' : visual.source === 'wikipedia' ? 'Wikipedia' : 'Cached photo', visual.attribution].filter(Boolean).join(' · ')}
+            {visual.license ? ` · ${visual.license}` : ''}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col p-5">
