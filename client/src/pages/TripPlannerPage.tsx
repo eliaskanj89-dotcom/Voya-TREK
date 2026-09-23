@@ -380,10 +380,10 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
   const mapInsetRight = rightPanelPx ? rightPanelPx + 10 : 0
 
   return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', ...fontStyle }}>
+    <div className="voya-planner" style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', ...fontStyle }}>
       <Navbar tripTitle={trip.title} tripId={tripId} showBack onBack={() => navigate('/dashboard')} onShare={() => setShowMembersModal(true)} />
 
-      <div className="bg-surface-elevated border-b border-edge-faint" style={{
+      <div className="voya-planner-tabs bg-surface-elevated border-b border-edge-faint" style={{
         position: 'fixed', top: 'var(--nav-h)', left: 0, right: 0, zIndex: 40,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '0 12px',
@@ -406,7 +406,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
       </div>
 
       {/* Offset by navbar + tab bar (44px) */}
-      <div style={{ position: 'fixed', top: 'calc(var(--nav-h) + 44px)', left: 0, right: 0, bottom: 0, overflow: 'hidden', overscrollBehavior: 'contain' }}>
+      <div className="voya-planner-stage" style={{ position: 'fixed', top: 'calc(var(--nav-h) + 44px)', left: 0, right: 0, bottom: 0, overflow: 'hidden', overscrollBehavior: 'contain' }}>
 
         {/* Plugin validation/warning contributions (#1429) — navbar chips for
             plugins with a tab here, floating bottom overlay for the rest. */}
@@ -561,14 +561,14 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
               document.body
             )}
 
-            <div className="hidden md:block" style={{ position: 'absolute', left: 10, top: 10, bottom: 10, zIndex: 20 }}>
+            <div className="voya-planner-left hidden md:block" style={{ position: 'absolute', left: 14, top: 14, bottom: 14, zIndex: 20 }}>
               <button type="button" onClick={toggleLeft}
                 aria-label={leftHidden ? t('trip.mobilePlan') : t('common.collapse')}
                 title={leftHidden ? t('trip.mobilePlan') : t('common.collapse')}
                 style={{
                   position: leftHidden ? 'fixed' : 'absolute', top: leftHidden ? 'calc(var(--nav-h) + 44px + 14px)' : 14, left: leftHidden ? 10 : undefined, right: leftHidden ? undefined : -28, zIndex: -1,
                   width: 36, height: 36, borderRadius: leftHidden ? 10 : '0 10px 10px 0',
-                  background: leftHidden ? '#000' : 'var(--sidebar-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                  background: leftHidden ? '#377CF6' : 'var(--sidebar-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
                   boxShadow: leftHidden ? '0 2px 12px rgba(0,0,0,0.2)' : 'none', border: 'none',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: leftHidden ? '#fff' : 'var(--text-faint)', transition: 'color 0.15s',
@@ -584,7 +584,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
                 backdropFilter: 'blur(24px) saturate(180%)',
                 WebkitBackdropFilter: 'blur(24px) saturate(180%)',
                 boxShadow: leftHidden ? 'none' : 'var(--sidebar-shadow)',
-                borderRadius: 16,
+                borderRadius: 24,
                 overflow: 'hidden', display: 'flex', flexDirection: 'column',
                 transition: 'width 0.25s ease',
                 opacity: leftHidden ? 0 : 1,
@@ -710,14 +710,14 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
               </div>
             </div>
 
-            <div className="hidden md:block" style={{ position: 'absolute', right: 10, top: 10, bottom: 10, zIndex: 20 }}>
+            <div className="voya-planner-right hidden md:block" style={{ position: 'absolute', right: 14, top: 14, bottom: 14, zIndex: 20 }}>
               <button type="button" onClick={toggleRight}
                 aria-label={rightHidden ? t('trip.mobilePlaces') : t('common.collapse')}
                 title={rightHidden ? t('trip.mobilePlaces') : t('common.collapse')}
                 style={{
                   position: rightHidden ? 'fixed' : 'absolute', top: rightHidden ? 'calc(var(--nav-h) + 44px + 14px)' : 14, right: rightHidden ? 10 : undefined, left: rightHidden ? undefined : -28, zIndex: -1,
                   width: 36, height: 36, borderRadius: rightHidden ? 10 : '10px 0 0 10px',
-                  background: rightHidden ? '#000' : 'var(--sidebar-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                  background: rightHidden ? '#377CF6' : 'var(--sidebar-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
                   boxShadow: rightHidden ? '0 2px 12px rgba(0,0,0,0.2)' : 'none', border: 'none',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: rightHidden ? '#fff' : 'var(--text-faint)', transition: 'color 0.15s',
@@ -733,7 +733,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
                 backdropFilter: 'blur(24px) saturate(180%)',
                 WebkitBackdropFilter: 'blur(24px) saturate(180%)',
                 boxShadow: rightHidden ? 'none' : 'var(--sidebar-shadow)',
-                borderRadius: 16,
+                borderRadius: 24,
                 overflow: 'hidden', display: 'flex', flexDirection: 'column',
                 transition: 'width 0.25s ease',
                 opacity: rightHidden ? 0 : 1,
