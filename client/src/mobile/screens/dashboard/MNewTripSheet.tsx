@@ -28,6 +28,8 @@ interface MNewTripSheetProps {
   open: boolean
   /** null = create, otherwise edit */
   trip: DashboardTrip | null
+  initialDestination?: string
+  initialDayCount?: number
   onClose: () => void
   onSave: (data: TripCreateRequest) => Promise<{ trip?: Trip } | void> | void
   onCoverUpdate?: (tripId: number, coverUrl: string | null) => void
@@ -46,7 +48,7 @@ function FieldLabel({ children }: { children: React.ReactNode }): React.ReactEle
  * title, date range and Unsplash cover search (plus device upload). Archiving
  * lives here in edit mode, as decided for the grid cards.
  */
-export default function MNewTripSheet({ open, trip, onClose, onSave, onCoverUpdate, onArchive }: MNewTripSheetProps): React.ReactElement {
+export default function MNewTripSheet({ open, trip, initialDestination, initialDayCount, onClose, onSave, onCoverUpdate, onArchive }: MNewTripSheetProps): React.ReactElement {
   const isEditing = !!trip
   const { t } = useTranslation()
   const toast = useToast()
@@ -75,7 +77,7 @@ export default function MNewTripSheet({ open, trip, onClose, onSave, onCoverUpda
 
   useEffect(() => {
     if (!open) return
-    setTitle(trip?.title || '')
+    setTitle(trip?.title || initialDestination?.trim() || '')
     setDescription(trip?.description || '')
     setStartDate(trip?.start_date || '')
     setEndDate(trip?.end_date || '')
@@ -87,7 +89,7 @@ export default function MNewTripSheet({ open, trip, onClose, onSave, onCoverUpda
     setSearchResults([])
     setSearchError('')
     setError('')
-  }, [trip, open])
+  }, [trip, open, initialDestination, initialDayCount])
 
   // The local file preview is a blob url; release it once a new cover replaces it
   // or the sheet goes away. Server and Unsplash urls are left alone.
@@ -126,7 +128,9 @@ export default function MNewTripSheet({ open, trip, onClose, onSave, onCoverUpda
         start_date: startDate || null,
         end_date: endDate || null,
         currency,
-        ...(!startDate && !endDate && !isEditing ? { day_count: 7 } : {}),
+        ...(!startDate && !endDate && !isEditing
+          ? { day_count: Number.isInteger(initialDayCount) && (initialDayCount ?? 0) > 0 ? initialDayCount! : 7 }
+          : {}),
       })
       const created = result ? result.trip : undefined
       if (pendingCoverFile && created?.id) {
