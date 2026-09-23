@@ -64,6 +64,7 @@ export default function VoyaReadinessPanel({ tripId }: VoyaReadinessPanelProps) 
     try {
       const result = await voyaAiApi.refreshReadiness({ tripId })
       setData(result)
+      window.dispatchEvent(new CustomEvent('voya:readiness-updated', { detail: { tripId } }))
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Voya could not refresh the readiness checklist.'))
     } finally {
@@ -82,6 +83,7 @@ export default function VoyaReadinessPanel({ tripId }: VoyaReadinessPanelProps) 
         status,
       })
       setData(result)
+      window.dispatchEvent(new CustomEvent('voya:readiness-updated', { detail: { tripId } }))
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Voya could not update this checklist item.'))
     } finally {
