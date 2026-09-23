@@ -285,7 +285,7 @@ export class VoyaAiService {
           day.notes ? `Current day notes: ${day.notes}` : '',
           `Traveler instruction: ${request.instruction}`,
           this.travelerDnaPrompt(travelerDna),
-          'Current assignments (these ids are authoritative):'
+          'Current assignments (these ids are authoritative):',
           JSON.stringify(context),
           'Every current assignmentId must appear exactly once: either as kind="existing" in sequence or in removedAssignmentIds.',
           'Never invent an assignmentId.',
