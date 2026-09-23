@@ -26,6 +26,8 @@ interface TripFormModalProps {
   // update resolves without a payload.
   onSave: (data: TripCreateRequest & { date_shift_mode?: DateShiftMode }) => Promise<{ trip?: Trip } | void> | void
   trip: Trip | null
+  initialDestination?: string
+  initialDayCount?: number
   onCoverUpdate?: (tripId: number, coverUrl: string | null) => void
 }
 
@@ -38,7 +40,7 @@ interface CoverSearchPhoto {
   link?: string | null
 }
 
-export default function TripFormModal({ isOpen, onClose, onSave, trip, onCoverUpdate }: TripFormModalProps) {
+export default function TripFormModal({ isOpen, onClose, onSave, trip, initialDestination, initialDayCount, onCoverUpdate }: TripFormModalProps) {
   const isEditing = !!trip
   const fileRef = useRef<HTMLInputElement>(null)
   const coverSearchSeq = useRef(0)
@@ -104,7 +106,15 @@ export default function TripFormModal({ isOpen, onClose, onSave, trip, onCoverUp
       setCoverPreview(trip.cover_image || null)
       setCoverSearchQuery('')
     } else {
-      setFormData({ title: '', description: '', start_date: '', end_date: '', currency: defaultCurrency, reminder_days: tripRemindersEnabled ? 3 : 0, day_count: 7 })
+      setFormData({
+        title: initialDestination?.trim() || '',
+        description: '',
+        start_date: '',
+        end_date: '',
+        currency: defaultCurrency,
+        reminder_days: tripRemindersEnabled ? 3 : 0,
+        day_count: Number.isInteger(initialDayCount) && (initialDayCount ?? 0) > 0 ? initialDayCount! : 7,
+      })
       setCustomReminder(false)
       setCoverPreview(null)
       setCoverSearchQuery('')
@@ -133,7 +143,7 @@ export default function TripFormModal({ isOpen, onClose, onSave, trip, onCoverUp
         tripsApi.getMembers(trip.id).then(d => setExistingMembers(d.members || [])).catch(() => {})
       }
     }
-  }, [trip, isOpen])
+  }, [trip, isOpen, initialDestination, initialDayCount])
 
   useEffect(() => {
     if (!trip && isOpen) {
