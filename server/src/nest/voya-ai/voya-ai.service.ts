@@ -9,9 +9,11 @@ import {
   type VoyaVerifyTripRequest,
   type VoyaVerifyTripResult,
   type VoyaTripEditPlan,
+  type VoyaTravelerDna,
   type VoyaTripEditRequest,
   voyaDayEditDraftSchema,
   voyaPlanDraftResponseSchema,
+  voyaTravelerDnaSchema,
   voyaTripEditPlanSchema,
 } from '@trek/shared';
 import { z } from 'zod';
@@ -24,6 +26,7 @@ import { DaysService } from '../days/days.service';
 import { PlacesService } from '../places/places.service';
 import { AssignmentsService } from '../assignments/assignments.service';
 import { MapsService } from '../maps/maps.service';
+import { SettingsService } from '../settings/settings.service';
 
 const generatedPlanSchema = voyaPlanDraftResponseSchema.omit({ generatedBy: true });
 const generatedDayEditSchema = voyaDayEditDraftSchema.omit({ tripId: true, dayId: true, generatedBy: true });
@@ -61,11 +64,13 @@ export class VoyaAiService {
     private readonly places: PlacesService,
     private readonly assignments: AssignmentsService,
     private readonly maps: MapsService,
+    private readonly settings: SettingsService,
   ) {}
 
   async planDraft(userId: number, request: VoyaPlanDraftRequest): Promise<VoyaPlanDraftResponse> {
     const config = this.configResolver.resolve(userId);
     if (!config) throw new VoyaAiUnavailableError();
+    const travelerDna = this.travelerDna(userId);
 
     const jsonSchema = z.toJSONSchema(generatedPlanSchema);
     let repair = '';
@@ -73,7 +78,7 @@ export class VoyaAiService {
     for (let attempt = 0; attempt < 2; attempt++) {
       const raw = await this.generator.generate(config, {
         system: SYSTEM_PROMPT,
-        user: this.userPrompt(request, repair),
+        user: this.userPrompt(request, repair, travelerDna),
         jsonSchema,
       });
 
@@ -201,6 +206,7 @@ export class VoyaAiService {
 
     const config = this.configResolver.resolve(user.id);
     if (!config) throw new VoyaAiUnavailableError();
+    const travelerDna = this.travelerDna(user.id);
 
     let repair = '';
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -209,6 +215,7 @@ export class VoyaAiService {
         user: [
           `Trip: ${trip.title || 'Untitled trip'}.`,
           `Traveler instruction: ${request.instruction}`,
+          this.travelerDnaPrompt(travelerDna),
           'Current trip days:',
           JSON.stringify(context),
           'Choose ONLY the days that actually need changes to satisfy the instruction.',
@@ -252,6 +259,7 @@ export class VoyaAiService {
     const current = this.assignments.listDayAssignments(request.dayId);
     const config = this.configResolver.resolve(user.id);
     if (!config) throw new VoyaAiUnavailableError();
+    const travelerDna = this.travelerDna(user.id);
 
     const context = current.map(a => ({
       assignmentId: a.id,
@@ -276,7 +284,8 @@ export class VoyaAiService {
           day.title ? `Current day title: ${day.title}.` : '',
           day.notes ? `Current day notes: ${day.notes}` : '',
           `Traveler instruction: ${request.instruction}`,
-          'Current assignments (these ids are authoritative):',
+          this.travelerDnaPrompt(travelerDna),
+          'Current assignments (these ids are authoritative):'
           JSON.stringify(context),
           'Every current assignmentId must appear exactly once: either as kind="existing" in sequence or in removedAssignmentIds.',
           'Never invent an assignmentId.',
@@ -579,13 +588,35 @@ export class VoyaAiService {
     };
   }
 
-  private userPrompt(request: VoyaPlanDraftRequest, repair: string): string {
+  private travelerDna(userId: number): VoyaTravelerDna | null {
+    const raw = this.settings.getUserSettings(userId).voya_traveler_dna;
+    const parsed = voyaTravelerDnaSchema.safeParse(raw);
+    return parsed.success ? parsed.data : null;
+  }
+
+  private travelerDnaPrompt(dna: VoyaTravelerDna | null): string {
+    if (!dna) return '';
+    return [
+      'Saved Traveler DNA (use as background preferences unless this request explicitly overrides it):',
+      `walking=${dna.walkingTolerance}`,
+      `mornings=${dna.morningStyle}`,
+      `nightlife=${dna.nightlifeFrequency}`,
+      `museums=${dna.museumInterest}`,
+      `localPreference=${dna.localPreference}/100`,
+      dna.foodStyle.length ? `food=${dna.foodStyle.join(', ')}` : '',
+      dna.hotelStyle.length ? `hotels=${dna.hotelStyle.join(', ')}` : '',
+      dna.notes ? `travelerNotes=${dna.notes}` : '',
+    ].filter(Boolean).join('; ');
+  }
+
+  private userPrompt(request: VoyaPlanDraftRequest, repair: string, travelerDna: VoyaTravelerDna | null): string {
     const interests = request.interests.length ? request.interests.join(', ') : 'general discovery, food, culture and local character';
     return [
       `Plan a ${request.days}-day trip to ${request.destination}${request.country ? `, ${request.country}` : ''}.`,
       request.startDate ? `Start date: ${request.startDate}.` : '',
       request.endDate ? `End date: ${request.endDate}.` : '',
       `Travelers: ${request.travelers}. Pace: ${request.pace}. Budget style: ${request.budgetStyle}. Currency: ${request.currency}.`,
+      this.travelerDnaPrompt(travelerDna),
       `Interests: ${interests}.`,
       request.notes ? `Traveler notes: ${request.notes}` : '',
       'Build a realistic daily rhythm with geographically coherent neighborhoods and enough breathing room for transfers.',
