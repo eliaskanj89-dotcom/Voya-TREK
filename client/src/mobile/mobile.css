@@ -390,3 +390,123 @@
 .m-hscroll::-webkit-scrollbar {
   display: none;
 }
+
+
+/* ── Voya mobile product layer ─────────────────────────────────────────── */
+.m-root {
+  font-family: var(--font-system);
+}
+.dark .m-root {
+  --m-ink: #F7FAFF;
+  --m-muted: #9FB1C7;
+  --m-faint: #7388A2;
+  --m-glass: rgba(11,27,47,.78);
+  --m-card: rgba(14,31,53,.78);
+  --m-cbr: rgba(255,255,255,.09);
+  --m-inner: rgba(255,255,255,.065);
+  --m-inbr: rgba(255,255,255,.10);
+  --m-sheet: rgba(9,23,40,.95);
+  --m-sheetop: #0B1728;
+  --m-ic: rgba(121,174,255,.09);
+  --m-avbr: rgba(255,255,255,.13);
+  --m-rowbr: rgba(174,205,244,.09);
+  --m-conn: #8298B3;
+  --m-mapb: #0B1728;
+  --m-mapr: #13233A;
+  --m-mapw: #08111E;
+  --m-mkr: #79AEFF;
+  --m-mkfg: #07111F;
+}
+
+.voya-mobile-brand {
+  border-radius: 999px;
+  background: rgba(255,255,255,.40);
+  border: 1px solid rgba(255,255,255,.74);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+}
+.dark .voya-mobile-brand {
+  background: rgba(255,255,255,.055);
+  border-color: rgba(255,255,255,.09);
+}
+
+.voya-mobile-orb {
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255,255,255,.38), transparent 25%),
+    linear-gradient(145deg, #5D9BFF 0%, #377CF6 58%, #245FD3 100%);
+  box-shadow: 0 16px 38px rgba(55,124,246,.30), inset 0 1px 0 rgba(255,255,255,.34);
+}
+
+.voya-mobile-dashboard {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(201,225,255,.42), transparent 28%),
+    transparent;
+}
+
+.voya-mobile-spotlight {
+  border: 1px solid rgba(255,255,255,.55);
+  isolation: isolate;
+}
+.voya-mobile-spotlight::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(4,17,33,.02) 30%, rgba(4,17,33,.22) 100%);
+}
+.voya-mobile-spotlight > * { z-index: 1; }
+.voya-mobile-spotlight > img,
+.voya-mobile-spotlight > div:first-child { z-index: 0; }
+
+.voya-mobile-trip-card {
+  box-shadow: 0 14px 34px rgba(31,67,112,.08), inset 0 1px 0 rgba(255,255,255,.82);
+  background: linear-gradient(145deg, rgba(255,255,255,.86), rgba(240,247,255,.74));
+}
+.dark .voya-mobile-trip-card {
+  background: linear-gradient(145deg, rgba(14,31,53,.90), rgba(8,22,39,.76));
+  box-shadow: 0 16px 38px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+.voya-mobile-trip .voya-day-rail > div:first-child {
+  box-shadow: 0 14px 34px rgba(31,67,112,.12), inset 0 1px 0 rgba(255,255,255,.86);
+  border-color: rgba(255,255,255,.90);
+  background: rgba(248,251,255,.80);
+}
+.dark .voya-mobile-trip .voya-day-rail > div:first-child {
+  background: rgba(10,25,44,.82);
+  border-color: rgba(255,255,255,.09);
+  box-shadow: 0 16px 38px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+.voya-mobile-trip .voya-day-rail button[aria-current="true"],
+.voya-mobile-trip .bg-m-act {
+  box-shadow: 0 8px 20px rgba(55,124,246,.28);
+}
+
+.voya-mobile-trip .voya-trip-top-controls [class*="backdrop-blur"],
+.voya-mobile-trip .voya-trip-top-controls > div {
+  border-color: rgba(255,255,255,.88);
+}
+
+.voya-mobile-trip .leaflet-control,
+.voya-mobile-trip .maplibregl-ctrl-group,
+.voya-mobile-trip .mapboxgl-ctrl-group {
+  border-radius: 16px !important;
+  overflow: hidden;
+  box-shadow: 0 12px 30px rgba(31,67,112,.16) !important;
+}
+
+.voya-mobile-trip button {
+  transition: transform .18s cubic-bezier(.16,1,.3,1), background .18s ease, color .18s ease;
+}
+.voya-mobile-trip button:active {
+  transform: scale(.965);
+}
+
+.m-root nav.fixed {
+  border-color: rgba(255,255,255,.92);
+  box-shadow: 0 20px 54px rgba(31,67,112,.16), inset 0 1px 0 rgba(255,255,255,.95);
+}
+.dark .m-root nav.fixed {
+  border-color: rgba(255,255,255,.09);
+  box-shadow: 0 22px 58px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.05);
+}
