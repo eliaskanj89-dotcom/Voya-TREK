@@ -12,6 +12,8 @@ import {
   type VoyaPlanDraftResponse,
   type VoyaVerifyTripRequest,
   type VoyaVerifyTripResult,
+  type VoyaTransportAdviceRequest,
+  type VoyaTransportAdviceResult,
   type VoyaTripEditPlan,
   type VoyaTravelerDna,
   type VoyaTripEditRequest,
@@ -47,6 +49,8 @@ import { PlacesService } from '../places/places.service';
 import { AssignmentsService } from '../assignments/assignments.service';
 import { MapsService } from '../maps/maps.service';
 import { SettingsService } from '../settings/settings.service';
+import { TransitService } from '../transit/transit.service';
+import { RoadtripRouterService } from '../roadtrip/roadtrip-router.service';
 
 const generatedPlanSchema = voyaPlanDraftResponseSchema.omit({ generatedBy: true });
 const generatedMultiCityPlanSchema = voyaMultiCityPlanDraftSchema.omit({ generatedBy: true });
@@ -91,6 +95,8 @@ export class VoyaAiService {
     private readonly assignments: AssignmentsService,
     private readonly maps: MapsService,
     private readonly settings: SettingsService,
+    private readonly transit: TransitService,
+    private readonly roadRouter: RoadtripRouterService,
   ) {}
 
   async resolveDestination(
@@ -723,6 +729,172 @@ export class VoyaAiService {
     }
 
     throw new VoyaAiInvalidDraftError('Voya could not produce a safe trip edit plan');
+  }
+
+  async transportAdvice(user: User, request: VoyaTransportAdviceRequest): Promise<VoyaTransportAdviceResult> {
+    const trip = this.days.verifyTripAccess(request.tripId, user.id);
+    if (!trip) throw new VoyaAiPermissionError('Trip not found');
+
+    const day = this.days.getDay(request.dayId, request.tripId);
+    if (!day) throw new VoyaAiInvalidDraftError('Transfer day not found');
+
+    const [originGeo, destinationGeo] = await Promise.all([
+      this.transit.geocode(request.origin, request.lang, undefined, user.id),
+      this.transit.geocode(request.destination, request.lang, undefined, user.id),
+    ]);
+
+    const origin = originGeo.results[0];
+    const destination = destinationGeo.results[0];
+    if (!origin || !destination) {
+      throw new VoyaAiInvalidDraftError('Voya could not resolve both transfer cities through the configured transit provider');
+    }
+
+    const departureIso =
+      request.departureDate && request.departureTime
+        ? new Date(`${request.departureDate}T${request.departureTime}:00`).toISOString()
+        : request.departureDate
+          ? new Date(`${request.departureDate}T09:00:00`).toISOString()
+          : undefined;
+
+    const from = `${origin.lat},${origin.lng}`;
+    const to = `${destination.lat},${destination.lng}`;
+
+    const [transitResult, roadResult] = await Promise.allSettled([
+      this.transit.plan(
+        {
+          from,
+          to,
+          time: departureIso,
+          modes: 'TRANSIT',
+          maxTransfers: 4,
+        },
+        request.lang,
+        user.id,
+      ),
+      this.roadRouter.route(
+        user.id,
+        request.tripId,
+        request.dayId,
+        [
+          { lat: origin.lat, lng: origin.lng },
+          { lat: destination.lat, lng: destination.lng },
+        ],
+        'driving',
+        [],
+      ),
+    ]);
+
+    const options: VoyaTransportAdviceResult['options'] = [];
+    let transitProvider: string | null = null;
+
+    if (transitResult.status === 'fulfilled') {
+      transitProvider = transitResult.value.provider;
+      const unique = transitResult.value.itineraries
+        .filter(itinerary => itinerary.duration > 0)
+        .sort((a, b) => a.duration - b.duration || a.transfers - b.transfers)
+        .slice(0, 3);
+
+      unique.forEach((itinerary, index) => {
+        const scheduledLegs = itinerary.legs.filter(leg => leg.mode !== 'WALK');
+        const operators = [...new Set(scheduledLegs.map(leg => leg.agency).filter((value): value is string => !!value))];
+        const lines = [...new Set(scheduledLegs.map(leg => leg.line).filter((value): value is string => !!value))];
+        const mainMode = scheduledLegs[0]?.mode || 'TRANSIT';
+        const departurePoint = scheduledLegs[0]?.from.name || origin.name;
+        const arrivalPoint = scheduledLegs.at(-1)?.to.name || destination.name;
+
+        options.push({
+          id: `transit-${index + 1}`,
+          mode: 'transit',
+          label: humanTransitMode(mainMode, lines),
+          durationMin: Math.max(1, Math.round(itinerary.duration / 60)),
+          durationLabel: formatMinutes(Math.max(1, Math.round(itinerary.duration / 60))),
+          distanceKm: null,
+          transfers: itinerary.transfers,
+          departurePoint,
+          arrivalPoint,
+          departureTime: itinerary.startTime || null,
+          arrivalTime: itinerary.endTime || null,
+          operatorLabel: operators.length ? operators.join(' · ') : lines.length ? lines.join(' · ') : null,
+          source: transitResult.value.provider,
+          sourceBacked: true,
+          liveFareAvailable: false,
+          fareLabel: 'Check current fare with the operator',
+          recommended: false,
+          notes: [
+            itinerary.transfers === 0 ? 'Direct scheduled journey.' : `${itinerary.transfers} transfer${itinerary.transfers === 1 ? '' : 's'}.`,
+            itinerary.walkSeconds > 0 ? `${Math.round(itinerary.walkSeconds / 60)} min walking included.` : '',
+          ].filter(Boolean),
+        });
+      });
+    }
+
+    if (roadResult.status === 'fulfilled') {
+      const seconds = roadResult.value.leg.seg.duration;
+      const meters = roadResult.value.leg.seg.distance;
+      options.push({
+        id: 'drive-1',
+        mode: 'drive',
+        label: 'Drive',
+        durationMin: Math.max(1, Math.round(seconds / 60)),
+        durationLabel: roadResult.value.leg.seg.durationText || formatMinutes(Math.max(1, Math.round(seconds / 60))),
+        distanceKm: Math.round((meters / 1000) * 10) / 10,
+        transfers: null,
+        departurePoint: origin.name,
+        arrivalPoint: destination.name,
+        departureTime: null,
+        arrivalTime: null,
+        operatorLabel: null,
+        source: 'TREK routing',
+        sourceBacked: true,
+        liveFareAvailable: false,
+        fareLabel: 'Fuel, tolls and parking not included',
+        recommended: false,
+        notes: [
+          roadResult.value.avoidMissed.length ? 'Routing could not honor every avoidance preference.' : 'Road duration from TREK routing.',
+        ],
+      });
+    }
+
+    if (!options.length) {
+      options.push({
+        id: 'flight-handoff',
+        mode: 'flight_handoff',
+        label: 'Check flight options',
+        durationMin: null,
+        durationLabel: 'No verified ground option returned',
+        distanceKm: null,
+        transfers: null,
+        departurePoint: request.origin,
+        arrivalPoint: request.destination,
+        departureTime: null,
+        arrivalTime: null,
+        operatorLabel: null,
+        source: 'Voya handoff',
+        sourceBacked: false,
+        liveFareAvailable: false,
+        fareLabel: 'Search current flights externally',
+        recommended: true,
+        notes: ['Voya has no live flight-search provider configured, so it will not invent schedules or fares.'],
+      });
+    } else {
+      markRecommendedTransport(options);
+    }
+
+    const recommended = options.find(option => option.recommended) ?? options[0];
+    return {
+      tripId: request.tripId,
+      origin: request.origin,
+      destination: request.destination,
+      checkedAt: new Date().toISOString(),
+      summary: `${recommended.label} is the strongest currently verified option Voya found for this transfer.`,
+      transitProvider,
+      options,
+      cautions: [
+        'Public-transport times come from the configured TREK transit provider and can still change.',
+        'Voya does not claim live fare or seat availability.',
+        'Flights are not compared unless a real flight-search provider is configured.',
+      ],
+    };
   }
 
   async planDayEdit(user: User, request: VoyaDayEditRequest): Promise<VoyaDayEditDraft> {
@@ -2075,4 +2247,39 @@ Return only the requested structured result.`;
 function isTransferActivity(category: string, name: string): boolean {
   const value = `${category} ${name}`.toLowerCase();
   return /\b(transport|transfer|train|rail|flight|airport|ferry|bus|drive|driving)\b/.test(value);
+}
+
+
+function formatMinutes(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours <= 0) return `${rest} min`;
+  if (rest === 0) return `${hours}h`;
+  return `${hours}h ${rest}m`;
+}
+
+function humanTransitMode(mode: string, lines: string[]): string {
+  const normalized = mode.toUpperCase();
+  const base =
+    normalized.includes('RAIL') || normalized === 'TRAIN' ? 'Train'
+      : normalized === 'BUS' || normalized === 'COACH' ? 'Bus'
+        : normalized === 'FERRY' ? 'Ferry'
+          : normalized === 'TRAM' ? 'Tram'
+            : normalized === 'SUBWAY' ? 'Metro'
+              : 'Public transit';
+  return lines.length ? `${base} · ${lines.slice(0, 2).join(' / ')}` : base;
+}
+
+function markRecommendedTransport(options: VoyaTransportAdviceResult['options']): void {
+  const transit = options
+    .filter(option => option.mode === 'transit' && option.durationMin != null)
+    .sort((a, b) => (a.durationMin! - b.durationMin!) || ((a.transfers ?? 99) - (b.transfers ?? 99)))[0];
+  const drive = options.find(option => option.mode === 'drive' && option.durationMin != null);
+
+  let winner = transit ?? drive ?? options[0];
+  if (transit && drive) {
+    const transitPenalty = transit.durationMin! * (1 + Math.min(0.3, (transit.transfers ?? 0) * 0.08));
+    winner = transitPenalty <= drive.durationMin! * 1.35 ? transit : drive;
+  }
+  for (const option of options) option.recommended = option.id === winner.id;
 }
