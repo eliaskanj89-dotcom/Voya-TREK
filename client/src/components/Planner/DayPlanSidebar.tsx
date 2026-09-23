@@ -1255,6 +1255,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
   const [panel, setPanel] = useState<HTMLElement | null>(null)
   const [narrowPanel, setNarrowPanel] = useState(false)
   const [voyaEditOpen, setVoyaEditOpen] = useState(false)
+  const [voyaEditSeed, setVoyaEditSeed] = useState('')
   const [voyaTripEditOpen, setVoyaTripEditOpen] = useState(false)
   const [voyaHistoryOpen, setVoyaHistoryOpen] = useState(false)
   useEffect(() => {
@@ -1590,6 +1591,11 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
           selectedDayId={selectedDayId}
           onOpenToday={(dayId) => onSelectDay(dayId, false)}
           onRouteRefresh={onRouteRefresh}
+          onAskVoya={(instruction, dayId) => {
+            if (selectedDayId !== dayId) onSelectDay(dayId, false)
+            setVoyaEditSeed(instruction)
+            setVoyaEditOpen(true)
+          }}
         />
       </div>
 
@@ -1598,7 +1604,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
           {selectedDayId != null && (
             <button
               type="button"
-              onClick={() => setVoyaEditOpen(true)}
+              onClick={() => { setVoyaEditSeed(''); setVoyaEditOpen(true) }}
               className="group flex min-w-0 flex-1 items-center justify-between gap-3 rounded-full border border-[#B8D2F5]/35 bg-[linear-gradient(145deg,rgba(241,248,255,.78),rgba(255,255,255,.62))] px-3.5 py-2 text-left transition-all hover:border-[#377CF6]/30 hover:bg-[#377CF6]/5 dark:border-white/7 dark:bg-white/4"
             >
               <span className="flex min-w-0 items-center gap-2.5">
@@ -3097,11 +3103,13 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
         return (
           <VoyaDayEditModal
             isOpen={voyaEditOpen}
-            onClose={() => setVoyaEditOpen(false)}
+            onClose={() => { setVoyaEditOpen(false); setVoyaEditSeed('') }}
             tripId={tripId}
             dayId={day.id}
             dayLabel={dayLabel}
             assignments={assignments[String(day.id)] || []}
+            initialInstruction={voyaEditSeed}
+            autoPreview={!!voyaEditSeed}
             onApplied={async () => {
               await useTripStore.getState().loadTrip(tripId)
               onRouteRefresh?.()
