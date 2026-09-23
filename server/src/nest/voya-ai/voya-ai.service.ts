@@ -8,8 +8,11 @@ import {
   type VoyaPlanDraftResponse,
   type VoyaVerifyTripRequest,
   type VoyaVerifyTripResult,
+  type VoyaTripEditPlan,
+  type VoyaTripEditRequest,
   voyaDayEditDraftSchema,
   voyaPlanDraftResponseSchema,
+  voyaTripEditPlanSchema,
 } from '@trek/shared';
 import { z } from 'zod';
 import { LlmConfigResolver } from '../llm-parse/llm-config.resolver';
@@ -24,6 +27,7 @@ import { MapsService } from '../maps/maps.service';
 
 const generatedPlanSchema = voyaPlanDraftResponseSchema.omit({ generatedBy: true });
 const generatedDayEditSchema = voyaDayEditDraftSchema.omit({ tripId: true, dayId: true, generatedBy: true });
+const generatedTripEditPlanSchema = voyaTripEditPlanSchema.omit({ tripId: true, generatedBy: true });
 
 export class VoyaAiUnavailableError extends Error {
   constructor() {
@@ -171,6 +175,70 @@ export class VoyaAiService {
         },
       };
     });
+  }
+
+  async planTripEdit(user: User, request: VoyaTripEditRequest): Promise<VoyaTripEditPlan> {
+    const trip = this.days.verifyTripAccess(request.tripId, user.id);
+    if (!trip) throw new VoyaAiPermissionError('Trip not found');
+    if (!this.days.canEdit(trip, user)) throw new VoyaAiPermissionError('No permission to edit this trip');
+
+    const tripDays = this.days.list(request.tripId).days;
+    if (tripDays.length === 0) throw new VoyaAiInvalidDraftError('This trip has no days to edit');
+
+    const context = tripDays.map(day => ({
+      dayId: day.id,
+      dayNumber: day.day_number ?? null,
+      date: day.date ?? null,
+      title: day.title ?? null,
+      notes: day.notes ?? null,
+      stops: (day.assignments || []).map(a => ({
+        assignmentId: a.id,
+        name: a.place?.name || '',
+        time: a.place?.place_time || null,
+        protected: a.accommodation_id != null,
+      })),
+    }));
+
+    const config = this.configResolver.resolve(user.id);
+    if (!config) throw new VoyaAiUnavailableError();
+
+    let repair = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const raw = await this.generator.generate(config, {
+        system: TRIP_EDIT_SYSTEM_PROMPT,
+        user: [
+          `Trip: ${trip.title || 'Untitled trip'}.`,
+          `Traveler instruction: ${request.instruction}`,
+          'Current trip days:',
+          JSON.stringify(context),
+          'Choose ONLY the days that actually need changes to satisfy the instruction.',
+          'Use only the dayId values supplied above. Never invent a day id.',
+          'For every affected day, write a concrete day-specific instruction that a second planning pass can execute safely.',
+          'Do not choose a day merely to make the edit feel comprehensive. Leave already-good days untouched.',
+          repair ? `Previous plan failed validation. Fix: ${repair}` : '',
+        ].filter(Boolean).join('\n'),
+        jsonSchema: z.toJSONSchema(generatedTripEditPlanSchema),
+      });
+
+      try {
+        const parsed = generatedTripEditPlanSchema.parse(raw);
+        const plan: VoyaTripEditPlan = {
+          ...parsed,
+          tripId: request.tripId,
+          generatedBy: { provider: config.provider, model: config.model },
+        };
+        this.assertTripEditPlan(plan, tripDays.map(day => day.id));
+        return plan;
+      } catch (error) {
+        if (attempt === 1) {
+          const detail = error instanceof Error ? error.message : 'unknown validation error';
+          throw new VoyaAiInvalidDraftError(`Voya could not produce a safe trip edit plan: ${detail}`);
+        }
+        repair = this.validationMessage(error);
+      }
+    }
+
+    throw new VoyaAiInvalidDraftError('Voya could not produce a safe trip edit plan');
   }
 
   async planDayEdit(user: User, request: VoyaDayEditRequest): Promise<VoyaDayEditDraft> {
@@ -529,6 +597,16 @@ export class VoyaAiService {
       'Do not include hotels as booked stays. You may describe a recommended base area in strategy.baseArea.',
       repair ? `Your previous draft failed validation. Correct these problems on the next full draft: ${repair}` : '',
     ].filter(Boolean).join('\n');
+  }
+
+  private assertTripEditPlan(plan: VoyaTripEditPlan, dayIds: number[]): void {
+    const valid = new Set(dayIds);
+    const seen = new Set<number>();
+    for (const item of plan.affectedDays) {
+      if (!valid.has(item.dayId)) throw new VoyaAiInvalidDraftError(`Unknown day id ${item.dayId}`);
+      if (seen.has(item.dayId)) throw new VoyaAiInvalidDraftError(`Day ${item.dayId} appears more than once`);
+      seen.add(item.dayId);
+    }
   }
 
   private normalizeDayEdit(raw: unknown): unknown {
