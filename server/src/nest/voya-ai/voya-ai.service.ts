@@ -199,7 +199,11 @@ export class VoyaAiService {
        ORDER BY CASE priority WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 ELSE 2 END, id ASC`,
       request.tripId,
     );
-    return readinessResult(request.tripId, rows, fingerprint);
+    const state = this.db.get<{ fingerprint: string; updated_at: string }>(
+      'SELECT fingerprint, updated_at FROM voya_readiness_state WHERE trip_id = ?',
+      request.tripId,
+    );
+    return readinessResult(request.tripId, rows, fingerprint, state ?? null);
   }
 
   async refreshReadiness(user: User, request: VoyaReadinessBuildRequest): Promise<VoyaReadinessResult> {
@@ -261,6 +265,13 @@ export class VoyaAiService {
 
     this.db.transaction(() => {
       this.db.run('DELETE FROM voya_readiness_items WHERE trip_id = ?', request.tripId);
+      this.db.run(
+        `INSERT INTO voya_readiness_state (trip_id, fingerprint, updated_at)
+         VALUES (?, ?, CURRENT_TIMESTAMP)
+         ON CONFLICT(trip_id) DO UPDATE SET fingerprint = excluded.fingerprint, updated_at = CURRENT_TIMESTAMP`,
+        request.tripId,
+        fingerprint,
+      );
       const insert = this.db.prepare(
         `INSERT INTO voya_readiness_items
           (trip_id, title, kind, priority, status, reason, action_label, day_id, place_id, fingerprint, created_at, updated_at)
@@ -1109,7 +1120,12 @@ function readinessFingerprint(value: unknown): string {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
-function readinessResult(tripId: number, rows: VoyaReadinessRow[], currentFingerprint: string): VoyaReadinessResult {
+function readinessResult(
+  tripId: number,
+  rows: VoyaReadinessRow[],
+  currentFingerprint: string,
+  state: { fingerprint: string; updated_at: string } | null,
+): VoyaReadinessResult {
   const weights = { High: 3, Medium: 2, Low: 1 } as const;
   let total = 0;
   let complete = 0;
@@ -1119,13 +1135,13 @@ function readinessResult(tripId: number, rows: VoyaReadinessRow[], currentFinger
     if (row.status === 'Done' || row.status === 'Not needed') complete += weight;
   }
   const score = total === 0 ? 100 : Math.round((complete / total) * 100);
-  const storedFingerprint = rows[0]?.fingerprint ?? null;
+  const storedFingerprint = state?.fingerprint ?? rows[0]?.fingerprint ?? null;
   return {
     tripId,
     score,
-    updatedAt: rows.reduce<string | null>((latest, row) => !latest || row.updated_at > latest ? row.updated_at : latest, null),
+    updatedAt: state?.updated_at ?? rows.reduce<string | null>((latest, row) => !latest || row.updated_at > latest ? row.updated_at : latest, null),
     fingerprint: storedFingerprint,
-    stale: rows.length > 0 && storedFingerprint !== currentFingerprint,
+    stale: storedFingerprint != null && storedFingerprint !== currentFingerprint,
     items: rows.map((row) => ({
       id: row.id,
       tripId: row.trip_id,
