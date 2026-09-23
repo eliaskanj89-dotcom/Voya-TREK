@@ -198,11 +198,13 @@ export default function VoyaPlanComposer({
           draft: multiDraft,
           reminderDays,
         })
+        startVoyaEnrichment(result.trip.id)
         await onCreated(result.trip)
         return
       }
       if (!draft || !request) return
       const result = await voyaAiApi.materializeDraft({ request, draft, reminderDays })
+      startVoyaEnrichment(result.trip.id)
       await onCreated(result.trip)
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Voya could not create this trip.'))
