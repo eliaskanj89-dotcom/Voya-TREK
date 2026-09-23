@@ -190,14 +190,14 @@ export class VoyaAiService {
 
     out.days = days.map((value, index) => {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
-      const day = { ...(value as Record<string, unknown>), dayNumber: index + 1 };
+      const day: Record<string, unknown> = { ...(value as Record<string, unknown>), dayNumber: index + 1 };
       if (request.startDate) day.date = addIsoDays(request.startDate, index);
       else delete day.date;
 
       if (Array.isArray(day.activities)) {
         day.activities = day.activities.map((activity) => {
           if (!activity || typeof activity !== 'object' || Array.isArray(activity)) return activity;
-          const next = { ...(activity as Record<string, unknown>), verificationStatus: 'Suggested', priceKnown: false };
+          const next: Record<string, unknown> = { ...(activity as Record<string, unknown>), verificationStatus: 'Suggested', priceKnown: false };
           delete next.price;
           return next;
         });
