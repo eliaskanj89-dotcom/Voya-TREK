@@ -589,3 +589,23 @@
   background: rgba(255,255,255,.055) !important;
   border-color: rgba(255,255,255,.08) !important;
 }
+
+
+.voya-loading-mark {
+  background:
+    radial-gradient(circle at 32% 22%, rgba(255,255,255,.45), transparent 25%),
+    linear-gradient(145deg, #79AEFF 0%, #377CF6 56%, #245FD3 100%);
+  box-shadow: 0 24px 60px rgba(55,124,246,.30), inset 0 1px 0 rgba(255,255,255,.42);
+}
+.voya-loading-ring {
+  border: 1px solid rgba(55,124,246,.18);
+  box-shadow: 0 0 0 10px rgba(55,124,246,.035), 0 0 0 22px rgba(55,124,246,.018);
+  animation: voya-ring-breathe 2.2s ease-in-out infinite;
+}
+@keyframes voya-ring-breathe {
+  0%, 100% { transform: scale(.96); opacity: .55; }
+  50% { transform: scale(1.04); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voya-loading-ring { animation: none; }
+}
