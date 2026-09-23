@@ -1,0 +1,60 @@
+name: Voya feature request
+description: Suggest an improvement to the Voya experience built on TREK
+title: "[Voya Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Voya. Please describe the traveler problem first, then the solution you have in mind.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Traveler problem
+      description: What is difficult, missing, confusing, or repetitive today?
+      placeholder: "When planning a multi-city trip, I need..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed improvement
+      description: Describe the behavior or experience you would like Voya to provide.
+      placeholder: "Voya should..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Area
+      options:
+        - Planning / Ask Voya
+        - Destination discovery
+        - Maps / places / verification
+        - Transport / routing
+        - Readiness / Trip Health
+        - Live Trip Mode
+        - Collaboration / reservations
+        - Mobile experience
+        - Visual / UX
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Add examples, screenshots, or constraints that would help explain the request.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I understand Voya does not book travel or guarantee live availability, prices, schedules, or entry requirements.
+          required: true
