@@ -1,13 +1,13 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   Bookmark, Check, CheckCheck, CheckCircle2, Download, ListChecks, Loader2, MapPin, Plus,
-  SlidersHorizontal, Tag, Trash2, X,
+  SlidersHorizontal, Sparkles, Tag, Trash2, X,
 } from 'lucide-react'
-import MDancingTrek from '../../../components/MDancingTrek'
 import { useTripStore } from '../../../../store/tripStore'
 import { useAddonStore } from '../../../../store/addonStore'
 import { useToast } from '../../../../components/shared/Toast'
 import { collectionsApi } from '../../../../api/collections'
+import { voyaAiApi } from '../../../../api/client'
 import PlaceAvatar from '../../../../components/shared/PlaceAvatar'
 import MarkdownText from '../../../../components/shared/MarkdownText'
 import { getCategoryIcon } from '../../../../components/shared/categoryIcons'
@@ -43,6 +43,7 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
 
   const filter = useTripStore(s => s.placesFilter)
   const setFilter = useTripStore(s => s.setPlacesFilter)
+  const loadTrip = useTripStore(s => s.loadTrip)
   const categoryFilters = useTripStore(s => s.placesCategoryFilter)
   const setCategoryFilters = useTripStore(s => s.setPlacesCategoryFilter)
 
@@ -55,6 +56,33 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
   const [markVisitedBusy, setMarkVisitedBusy] = useState(false)
   const toast = useToast()
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [voyaVerifyBusy, setVoyaVerifyBusy] = useState(false)
+  const [voyaVerifySummary, setVoyaVerifySummary] = useState<{ verified: number; unresolved: number } | null>(null)
+  const voyaSuggestionCount = useMemo(
+    () => places.filter(place =>
+      /Suggested by Voya — verify current details before relying on them\./i.test(place.notes || '')
+    ).length,
+    [places],
+  )
+
+  const verifyVoyaSuggestions = async () => {
+    if (voyaVerifyBusy || voyaSuggestionCount === 0) return
+    setVoyaVerifyBusy(true)
+    try {
+      const result = await voyaAiApi.verifyTrip({ tripId: planner.tripId })
+      setVoyaVerifySummary({ verified: result.verified, unresolved: result.unresolved })
+      await loadTrip(planner.tripId)
+      if (result.verified > 0) {
+        toast.success(`Voya matched ${result.verified} suggestion${result.verified === 1 ? '' : 's'} to real map records.`)
+      } else {
+        toast.warning('Voya could not confidently match these suggestions yet.')
+      }
+    } catch {
+      toast.error('Voya could not verify these places right now.')
+    } finally {
+      setVoyaVerifyBusy(false)
+    }
+  }
 
   // Entering the browser from the edit segment starts on the unplanned pool.
   useEffect(() => {
@@ -238,6 +266,36 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
           )}
         </div>
 
+        {voyaSuggestionCount > 0 && (
+          <div className="voya-mobile-verification mt-3 rounded-[22px] border border-[color:var(--m-rowbr)] bg-[color:var(--m-glass)] p-3.5 backdrop-blur-[24px]">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-m-act text-m-actfg shadow-[0_8px_20px_rgba(55,124,246,.24)]">
+                <Sparkles size={15} strokeWidth={2.2} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[0.8125rem] font-semibold text-m-ink">Verify Voya suggestions</div>
+                <p className="mt-0.5 font-geist text-[0.65625rem] leading-relaxed text-m-muted">
+                  Match {voyaSuggestionCount} suggested place{voyaSuggestionCount === 1 ? '' : 's'} to real map records.
+                </p>
+                {voyaVerifySummary && (
+                  <div className="mt-1.5 font-geist text-[0.625rem] font-medium text-m-muted">
+                    {voyaVerifySummary.verified} matched · {voyaVerifySummary.unresolved} unresolved
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={voyaVerifyBusy}
+              onClick={() => { void verifyVoyaSuggestions() }}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-m-act px-3 py-[9px] text-[0.6875rem] font-semibold text-m-actfg shadow-[0_8px_20px_rgba(55,124,246,.20)] disabled:opacity-60"
+            >
+              {voyaVerifyBusy ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={13} />}
+              {voyaVerifyBusy ? 'Checking providers…' : 'Verify now'}
+            </button>
+          </div>
+        )}
+
         {/* Stays Dawarich recorded on these dates (#2279). Same component as the
             desktop rail — the rows are the same rows, and the panel renders
             nothing when there is nothing pending. */}
@@ -331,12 +389,16 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
         {filtered.length === 0 ? (
           filter === 'unplanned' && !search && categoryFilters.size === 0 ? (
             <div className="flex min-h-[60vh] flex-col items-center justify-center px-8 py-10 text-center">
-              <MDancingTrek scene="idle" mood="happy" className="mb-2" />
+              <div aria-hidden className="voya-mobile-orb mb-4 flex h-[68px] w-[68px] items-center justify-center rounded-full">
+                <span className="voya-wordmark text-[28px] text-white">V</span>
+              </div>
               <p className="font-geist text-[0.8125rem] font-medium text-m-muted">{t('places.allPlanned')}</p>
             </div>
           ) : (
             <div className="flex min-h-[60vh] flex-col items-center justify-center px-8 py-10 text-center">
-              <MDancingTrek scene="search" className="mb-2" />
+              <div aria-hidden className="voya-mobile-orb mb-4 flex h-[68px] w-[68px] items-center justify-center rounded-full">
+                <span className="voya-wordmark text-[28px] text-white">V</span>
+              </div>
               <p className="font-geist text-[0.8125rem] font-medium text-m-muted">{t('places.noneFound')}</p>
             </div>
           )
