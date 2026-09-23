@@ -39,6 +39,7 @@ import {
   voyaPlanDraftResponseSchema,
   voyaTravelerDnaSchema,
   voyaTripEditPlanSchema,
+  optimizeRoute,
 } from '@trek/shared';
 import { z } from 'zod';
 import { LlmConfigResolver } from '../llm-parse/llm-config.resolver';
@@ -54,6 +55,7 @@ import { SettingsService } from '../settings/settings.service';
 import { TransitService } from '../transit/transit.service';
 import { RoadtripRouterService } from '../roadtrip/roadtrip-router.service';
 import { TodoService } from '../todo/todo.service';
+import { AccommodationsService } from '../accommodations/accommodations.service';
 
 const generatedPlanSchema = voyaPlanDraftResponseSchema.omit({ generatedBy: true });
 const generatedMultiCityPlanSchema = voyaMultiCityPlanDraftSchema.omit({ generatedBy: true });
@@ -101,6 +103,7 @@ export class VoyaAiService {
     private readonly transit: TransitService,
     private readonly roadRouter: RoadtripRouterService,
     private readonly todo: TodoService,
+    private readonly accommodations: AccommodationsService,
   ) {}
 
   async resolveDestination(
@@ -1669,15 +1672,90 @@ export class VoyaAiService {
       }
     }
 
+    const optimizedDays = this.optimizeVerifiedVoyaDays(tripId);
+
     return {
       tripId,
       checked: rows.length - skipped,
       verified,
       unresolved,
       skipped,
+      optimizedDays,
       sourceCounts,
       items,
     };
+  }
+
+  private optimizeVerifiedVoyaDays(tripId: number): number {
+    const tripDays = this.days.list(tripId).days;
+    const dayIndex = new Map(tripDays.map((day, index) => [day.id, index]));
+    const stays = this.accommodations.list(tripId) as Array<{
+      start_day_id: number;
+      end_day_id: number;
+      place_lat?: number | null;
+      place_lng?: number | null;
+    }>;
+    let changedDays = 0;
+
+    const anchorFor = (dayId: number, side: 'morning' | 'evening') => {
+      const index = dayIndex.get(dayId);
+      if (index == null) return undefined;
+      for (const stay of stays) {
+        const start = dayIndex.get(stay.start_day_id);
+        const end = dayIndex.get(stay.end_day_id);
+        if (start == null || end == null || stay.place_lat == null || stay.place_lng == null) continue;
+        const active = side === 'morning'
+          ? index > start && index <= end
+          : index >= start && index < end;
+        if (active) return { lat: stay.place_lat, lng: stay.place_lng };
+      }
+      return undefined;
+    };
+
+    for (const day of tripDays) {
+      const current = this.assignments.listDayAssignments(day.id);
+      if (current.length < 2) continue;
+
+      const movableSlots: number[] = [];
+      const movable: Array<{ id: number; lat: number; lng: number }> = [];
+
+      current.forEach((assignment, index) => {
+        const place = assignment.place;
+        const located = place?.lat != null && place?.lng != null;
+        const timed = Boolean(place?.place_time);
+        const protectedStop = this.assignmentProtectedFromAiEdit(assignment);
+        const voyaManaged = isVoyaManagedPlace(place?.notes);
+        if (!located || timed || protectedStop || !voyaManaged) return;
+        movableSlots.push(index);
+        movable.push({ id: assignment.id, lat: place!.lat!, lng: place!.lng! });
+      });
+
+      if (movable.length < 2) continue;
+
+      const start = anchorFor(day.id, 'morning');
+      const end = anchorFor(day.id, 'evening');
+      const optimized = optimizeRoute(movable, { start, end });
+      const beforeIds = movable.map(item => item.id);
+      const afterIds = optimized.map(item => item.id);
+      if (beforeIds.every((id, index) => id === afterIds[index])) continue;
+
+      const finalOrder = current.map(assignment => assignment.id);
+      movableSlots.forEach((slot, index) => {
+        finalOrder[slot] = afterIds[index];
+      });
+
+      this.assignments.reorderAssignments(day.id, finalOrder);
+      this.assignments.broadcast(
+        String(tripId),
+        'assignment:reordered',
+        { dayId: day.id, orderedIds: finalOrder },
+        undefined,
+      );
+      changedDays++;
+    }
+
+    if (changedDays > 0) this.assignments.reconcile(tripId);
+    return changedDays;
   }
 
   private travelerDna(userId: number): VoyaTravelerDna | null {
@@ -2326,4 +2404,11 @@ function markRecommendedTransport(options: VoyaTransportAdviceResult['options'])
     winner = transitPenalty <= drive.durationMin! * 1.35 ? transit : drive;
   }
   for (const option of options) option.recommended = option.id === winner.id;
+}
+
+
+function isVoyaManagedPlace(notes: string | null | undefined): boolean {
+  const value = notes || '';
+  return /Suggested by Voya — verify current details before relying on them\./i.test(value)
+    || /Matched by Voya to a .* place record on /i.test(value);
 }
