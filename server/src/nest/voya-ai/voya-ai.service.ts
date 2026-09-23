@@ -20,6 +20,9 @@ import {
   type VoyaDestinationDiscoveryResult,
   type VoyaDestinationResolveRequest,
   type VoyaDestinationResolveResult,
+  type VoyaEditHistoryRequest,
+  type VoyaEditHistoryResult,
+  type VoyaRestoreEditSnapshotRequest,
   type VoyaReadinessBuildRequest,
   type VoyaReadinessResult,
   type VoyaReadinessStatusRequest,
@@ -808,9 +811,10 @@ export class VoyaAiService {
     const current = this.assignments.listDayAssignments(draft.dayId);
     this.assertDayEditDraft(draft, current);
 
-    const mutation = this.db.transaction(() =>
-      this.applyDayEditMutation(draft, current, day, trip.title || 'this trip'),
-    );
+    const mutation = this.db.transaction(() => {
+      this.createEditSnapshot(user.id, draft.tripId, [draft.dayId], 'day', `Before Voya day edit: ${draft.summary.slice(0, 120)}`);
+      return this.applyDayEditMutation(draft, current, day, trip.title || 'this trip');
+    });
 
     this.broadcastDayEditMutation(draft.tripId, draft.dayId, mutation);
     this.assignments.reconcile(draft.tripId);
@@ -836,11 +840,12 @@ export class VoyaAiService {
       return { draft, day, current };
     });
 
-    const mutations = this.db.transaction(() =>
-      contexts.map(({ draft, day, current }) =>
+    const mutations = this.db.transaction(() => {
+      this.createEditSnapshot(user.id, tripId, expectedDayIds, 'trip', `Before Voya whole-trip edit: ${parsed.plan.summary.slice(0, 120)}`);
+      return contexts.map(({ draft, day, current }) =>
         this.applyDayEditMutation(draft, current, day, trip.title || 'this trip'),
-      ),
-    );
+      );
+    });
 
     for (let index = 0; index < contexts.length; index++) {
       this.broadcastDayEditMutation(
