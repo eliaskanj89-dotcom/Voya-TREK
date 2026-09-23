@@ -29,6 +29,7 @@ import {
   type VoyaPlanDraftRequest, type VoyaPlanDraftResponse, type VoyaApplyDayEditRequest, type VoyaDayEditDraft, type VoyaDayEditRequest,
   type VoyaMaterializeDraftRequest, type VoyaTripEditPlan, type VoyaTripEditRequest, type VoyaVerifyTripRequest, type VoyaVerifyTripResult,
   type VoyaReadinessBuildRequest, type VoyaReadinessResult, type VoyaReadinessStatusRequest,
+  type VoyaDestinationDiscoveryRequest, type VoyaDestinationDiscoveryResult,
   type Trip, type Day,
   type DayCreateRequest, type DayUpdateRequest, type DayReorderRequest,
   type PlaceCreateRequest, type PlaceUpdateRequest,
@@ -413,6 +414,8 @@ export const oauthApi = {
 }
 
 export const voyaAiApi = {
+  discoverDestinations: (data: VoyaDestinationDiscoveryRequest): Promise<VoyaDestinationDiscoveryResult> =>
+    apiClient.post('/voya-ai/discover-destinations', data, { timeout: 120000 }).then(r => r.data),
   readiness: (data: VoyaReadinessBuildRequest): Promise<VoyaReadinessResult> =>
     apiClient.post('/voya-ai/readiness', data).then(r => r.data),
   refreshReadiness: (data: VoyaReadinessBuildRequest): Promise<VoyaReadinessResult> =>
