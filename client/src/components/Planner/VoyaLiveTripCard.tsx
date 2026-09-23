@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CloudRain, Clock, Coffee, Hotel, MapPin, Navigation, SkipForward, Sparkles, TimerReset } from 'lucide-react'
+import type { WeatherResult } from '@trek/shared'
 import type { Accommodation, Assignment, AssignmentsMap, Day, Reservation } from '../../types'
-import { assignmentsApi } from '../../api/client'
+import { assignmentsApi, weatherApi } from '../../api/client'
 import { useToast } from '../shared/Toast'
 import { useTripStore } from '../../store/tripStore'
 import { findTodayDayId } from './today'
@@ -57,6 +58,8 @@ export default function VoyaLiveTripCard({
   const toast = useToast()
   const [clock, setClock] = useState(() => new Date())
   const [shifting, setShifting] = useState(false)
+  const [weather, setWeather] = useState<WeatherResult | null>(null)
+  const [weatherLoading, setWeatherLoading] = useState(false)
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(new Date()), 60_000)
@@ -77,6 +80,72 @@ export default function VoyaLiveTripCard({
   )
 
   const next = timedAssignments.find(row => row.start >= nowMinutes) ?? null
+
+  const weatherAnchor = useMemo(() => {
+    const remaining = todayAssignments
+      .map(assignment => ({
+        assignment,
+        start: parseTime(effectiveStart(assignment)),
+      }))
+      .filter(row => row.start == null || row.start >= nowMinutes)
+      .sort((a, b) => (a.start ?? 9999) - (b.start ?? 9999))
+    const pool = [...remaining.map(row => row.assignment), ...todayAssignments]
+    return pool.find(assignment =>
+      assignment.place?.lat != null && assignment.place?.lng != null,
+    ) ?? null
+  }, [todayAssignments, nowMinutes])
+
+  useEffect(() => {
+    const lat = weatherAnchor?.place?.lat
+    const lng = weatherAnchor?.place?.lng
+    const date = todayDay?.date
+    if (lat == null || lng == null || !date) {
+      setWeather(null)
+      setWeatherLoading(false)
+      return
+    }
+    let cancelled = false
+    setWeatherLoading(true)
+    weatherApi.getDetailed(lat, lng, date, 'en')
+      .then(result => {
+        if (cancelled) return
+        setWeather(result.type === 'forecast' && !result.error ? result : null)
+      })
+      .catch(() => {
+        if (!cancelled) setWeather(null)
+      })
+      .finally(() => {
+        if (!cancelled) setWeatherLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [weatherAnchor?.place?.lat, weatherAnchor?.place?.lng, todayDay?.date])
+
+  const weatherRisk = useMemo(() => {
+    if (!weather || weather.type !== 'forecast') return null
+    const currentHour = clock.getHours()
+    const remainingHours = (weather.hourly || []).filter(hour => hour.hour >= currentHour)
+    const risky = remainingHours.filter(hour =>
+      /rain|drizzle|thunderstorm|snow/i.test(hour.main)
+      || hour.precipitation_probability >= 45
+      || hour.precipitation >= 0.5,
+    )
+    if (!risky.length) return null
+
+    const peakProbability = Math.max(...risky.map(hour => hour.precipitation_probability || 0))
+    const first = risky[0]
+    const severe = risky.some(hour =>
+      /thunderstorm|snow/i.test(hour.main)
+      || hour.precipitation_probability >= 70
+      || hour.precipitation >= 2,
+    )
+    return {
+      firstHour: first.hour,
+      peakProbability,
+      severe,
+      condition: first.main || weather.main || 'Rain',
+      anchorName: weatherAnchor?.place?.name || null,
+    }
+  }, [weather, clock, weatherAnchor?.place?.name])
 
   const bookends = useMemo(
     () => todayDay ? getDayBookendHotels(todayDay, days, accommodations) : {},
@@ -166,9 +235,11 @@ export default function VoyaLiveTripCard({
     },
     {
       key: 'rain',
-      label: 'Rain plan',
+      label: weatherRisk ? `${weatherRisk.condition} plan` : 'Rain plan',
       Icon: CloudRain,
-      instruction: `Assume rain is affecting the remaining part of today. Rework only the remaining schedule toward indoor or weather-resilient options while preserving the day's core intent, protected hotel-linked items, booked transport, and anything already completed. Minimize unnecessary outdoor walking.`,
+      instruction: weatherRisk
+        ? `TREK's actual hourly forecast for today's itinerary shows ${weatherRisk.condition.toLowerCase()} risk from around ${String(weatherRisk.firstHour).padStart(2, '0')}:00, with precipitation probability reaching about ${weatherRisk.peakProbability}%. Rework only the remaining schedule toward indoor or weather-resilient options before/during that window. Preserve the day's core intent, protected hotel-linked items, booked transport, and anything already completed. Minimize unnecessary outdoor walking. Treat the forecast as changeable, not guaranteed.`
+        : `Assume rain is affecting the remaining part of today. Rework only the remaining schedule toward indoor or weather-resilient options while preserving the day's core intent, protected hotel-linked items, booked transport, and anything already completed. Minimize unnecessary outdoor walking.`,
     },
   ] : []
 
@@ -254,6 +325,34 @@ export default function VoyaLiveTripCard({
           </div>
         )}
       </div>
+
+
+      {(weatherRisk || weatherLoading) && (
+        <div className={`mt-3 rounded-[16px] border px-3.5 py-3 ${
+          weatherRisk?.severe
+            ? 'border-[#79AEFF]/24 bg-[#79AEFF]/10'
+            : 'border-white/8 bg-white/6'
+        }`}>
+          <div className="flex items-start gap-2.5">
+            <CloudRain size={14} className="mt-0.5 flex-none text-[#9DCAFF]" />
+            <div className="min-w-0 flex-1">
+              <div className="text-[9px] font-semibold uppercase tracking-[.12em] text-[#9DCAFF]">Forecast watch</div>
+              {weatherLoading && !weatherRisk ? (
+                <div className="mt-1 text-[11px] text-white/50">Checking TREK’s hourly forecast…</div>
+              ) : weatherRisk ? (
+                <>
+                  <div className="mt-1 text-[12px] font-semibold text-white">
+                    {weatherRisk.condition} risk from about {String(weatherRisk.firstHour).padStart(2, '0')}:00
+                  </div>
+                  <div className="mt-0.5 text-[10px] leading-relaxed text-white/48">
+                    Peak precipitation probability about {weatherRisk.peakProbability}%{weatherRisk.anchorName ? ` near ${weatherRisk.anchorName}` : ''}. Open-Meteo forecast via TREK; conditions can change.
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-2">
         {navigationTarget && (
