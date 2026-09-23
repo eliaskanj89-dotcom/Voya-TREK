@@ -19,6 +19,7 @@ import { VoyaApplyDayEditDto,
   VoyaReadinessStatusDto,
   VoyaReadinessToTodoDto,
   VoyaDestinationDiscoveryDto,
+  VoyaDestinationResolveDto,
   VoyaTransportAdviceDto,
   VoyaTripHealthDto
 } from './voya-ai.dto';
@@ -50,6 +51,25 @@ export class VoyaAiController {
       }
       console.error('Voya destination discovery failed:', error instanceof Error ? error.message : 'unknown error');
       throw new HttpException({ error: 'Voya could not discover destinations right now', code: 'VOYA_DISCOVERY_ERROR' }, 500);
+    }
+  }
+
+  @Post('resolve-destination')
+  async resolveDestination(@CurrentUser() user: User, @Body() body: VoyaDestinationResolveDto) {
+    try {
+      return await this.voya.resolveDestination(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiUnavailableError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_NOT_CONFIGURED' }, 409);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_DESTINATION_RESOLVE_INVALID_RESULT' }, 502);
+      }
+      if (error instanceof StructuredGenerationError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_PROVIDER_ERROR' }, 502);
+      }
+      console.error('Voya destination resolution failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not resolve this destination right now', code: 'VOYA_DESTINATION_RESOLVE_ERROR' }, 500);
     }
   }
 
