@@ -443,3 +443,16 @@ export const voyaTransportAdviceResultSchema = z.object({
   cautions: z.array(z.string().trim().min(1).max(220)).max(5),
 });
 export type VoyaTransportAdviceResult = z.infer<typeof voyaTransportAdviceResultSchema>;
+
+
+export const voyaReadinessToTodoRequestSchema = z.object({
+  tripId: z.number().int().positive(),
+  itemId: z.number().int().positive(),
+});
+export type VoyaReadinessToTodoRequest = z.infer<typeof voyaReadinessToTodoRequestSchema>;
+
+export const voyaReadinessToTodoResultSchema = z.object({
+  created: z.boolean(),
+  todoItemId: z.number().int().positive(),
+});
+export type VoyaReadinessToTodoResult = z.infer<typeof voyaReadinessToTodoResultSchema>;
