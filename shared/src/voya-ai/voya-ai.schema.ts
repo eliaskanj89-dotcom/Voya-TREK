@@ -457,3 +457,61 @@ export const voyaReadinessToTodoResultSchema = z.object({
   todoItemId: z.number().int().positive(),
 });
 export type VoyaReadinessToTodoResult = z.infer<typeof voyaReadinessToTodoResultSchema>;
+
+
+export const voyaTripHealthRequestSchema = z.object({
+  tripId: z.number().int().positive(),
+});
+export type VoyaTripHealthRequest = z.infer<typeof voyaTripHealthRequestSchema>;
+
+export const voyaTripHealthCategorySchema = z.enum([
+  'Verification',
+  'Schedule',
+  'Route',
+  'Readiness',
+  'Reservation',
+]);
+export type VoyaTripHealthCategory = z.infer<typeof voyaTripHealthCategorySchema>;
+
+export const voyaTripHealthSeveritySchema = z.enum(['High', 'Medium', 'Low']);
+export type VoyaTripHealthSeverity = z.infer<typeof voyaTripHealthSeveritySchema>;
+
+export const voyaTripHealthIssueSchema = z.object({
+  id: z.string().trim().min(1).max(160),
+  category: voyaTripHealthCategorySchema,
+  severity: voyaTripHealthSeveritySchema,
+  title: z.string().trim().min(1).max(180),
+  reason: z.string().trim().min(1).max(600),
+  actionLabel: z.string().trim().max(120).optional(),
+  dayId: z.number().int().positive().nullable().optional(),
+  placeId: z.number().int().positive().nullable().optional(),
+  deduction: z.number().int().min(0).max(30),
+});
+export type VoyaTripHealthIssue = z.infer<typeof voyaTripHealthIssueSchema>;
+
+export const voyaTripHealthResultSchema = z.object({
+  tripId: z.number().int().positive(),
+  score: z.number().int().min(0).max(100),
+  label: z.enum(['Excellent', 'Strong', 'Needs attention', 'At risk']),
+  checkedAt: z.string(),
+  breakdown: z.object({
+    verification: z.number().int().min(0).max(100),
+    schedule: z.number().int().min(0).max(100),
+    route: z.number().int().min(0).max(100),
+    readiness: z.number().int().min(0).max(100),
+    reservation: z.number().int().min(0).max(100),
+  }),
+  metrics: z.object({
+    daysChecked: z.number().int().nonnegative(),
+    assignedStops: z.number().int().nonnegative(),
+    verifiedStops: z.number().int().nonnegative(),
+    unresolvedSuggestions: z.number().int().nonnegative(),
+    overloadedDays: z.number().int().nonnegative(),
+    overlapDays: z.number().int().nonnegative(),
+    inefficientRouteDays: z.number().int().nonnegative(),
+    openHighReadiness: z.number().int().nonnegative(),
+    reservationsNeedingReview: z.number().int().nonnegative(),
+  }),
+  issues: z.array(voyaTripHealthIssueSchema).max(30),
+});
+export type VoyaTripHealthResult = z.infer<typeof voyaTripHealthResultSchema>;
