@@ -138,6 +138,23 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>()(
           // `kind` rides along: it is not a review flag but the context the review
           // needs, and without it a reload silently falls back to 'bookings'.
           .map((t) => ({ id: t.id, tripId: t.tripId, label: t.label, status: t.status, done: t.done, total: t.total, kind: t.kind })),
+        // Voya refinement is idempotent and can safely resume after a reload.
+        // Keep running tasks so the global widget can restart them, and completed
+        // tasks so the traveler does not lose the refinement summary instantly.
+        voyaTasks: state.voyaTasks
+          .filter(task => task.status !== 'error')
+          .map(task => ({
+            id: task.id,
+            tripId: task.tripId,
+            label: task.label,
+            status: task.status,
+            verified: task.verified,
+            unresolved: task.unresolved,
+            optimizedDays: task.optimizedDays,
+            readinessRefreshed: task.readinessRefreshed,
+            healthScore: task.healthScore,
+            healthLabel: task.healthLabel,
+          })),
       }),
     },
   ),
