@@ -15,6 +15,7 @@ import MTripTabPanel from './tabs/MTripTabPanel'
 import MTripSheets from './sheets/MTripSheets'
 import MTripLoadingSplash from './MTripLoadingSplash'
 import MVoyaReadinessButton from './MVoyaReadinessButton'
+import VoyaTripHealthPanel from '../../../components/Planner/VoyaTripHealthPanel'
 import { usePluginDayTints, dayTintBackground } from '../../../components/Plugins/PluginDaySchedule'
 import { stageOf } from '../../../components/Roadtrip/roadtripRowModel'
 import { badgeLabel, distanceBadge } from './roadtrip/stageBadges'
@@ -711,6 +712,7 @@ export default function MTripShell({
           <div className="flex flex-none items-center gap-2">
             {trTab === 'plan' && (
               <MVoyaReadinessButton tripId={tripId} onOpen={() => openSheet('readiness')} />
+              <VoyaTripHealthPanel tripId={tripId} mobile />
             )}
             <MIconBtn
               ariaLabel={mapFront ? t('mobileTrip.listView') : t('mobileTrip.mapView')}
