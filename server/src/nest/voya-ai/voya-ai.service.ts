@@ -11,6 +11,11 @@ import {
   type VoyaTripEditPlan,
   type VoyaTravelerDna,
   type VoyaTripEditRequest,
+  type VoyaGeneratedReadinessItem,
+  type VoyaReadinessBuildRequest,
+  type VoyaReadinessResult,
+  type VoyaReadinessStatusRequest,
+  voyaGeneratedReadinessItemSchema,
   voyaDayEditDraftSchema,
   voyaPlanDraftResponseSchema,
   voyaTravelerDnaSchema,
@@ -31,6 +36,9 @@ import { SettingsService } from '../settings/settings.service';
 const generatedPlanSchema = voyaPlanDraftResponseSchema.omit({ generatedBy: true });
 const generatedDayEditSchema = voyaDayEditDraftSchema.omit({ tripId: true, dayId: true, generatedBy: true });
 const generatedTripEditPlanSchema = voyaTripEditPlanSchema.omit({ tripId: true, generatedBy: true });
+const generatedReadinessSchema = z.object({
+  items: z.array(voyaGeneratedReadinessItemSchema).max(12),
+});
 
 export class VoyaAiUnavailableError extends Error {
   constructor() {
@@ -180,6 +188,186 @@ export class VoyaAiService {
         },
       };
     });
+  }
+
+  getReadiness(user: User, request: VoyaReadinessBuildRequest): VoyaReadinessResult {
+    this.assertTripAccess(request.tripId, user.id);
+    const context = this.readinessContext(request.tripId);
+    const fingerprint = readinessFingerprint(context);
+    const rows = this.db.all<VoyaReadinessRow>(
+      `SELECT * FROM voya_readiness_items WHERE trip_id = ?
+       ORDER BY CASE priority WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 ELSE 2 END, id ASC`,
+      request.tripId,
+    );
+    return readinessResult(request.tripId, rows, fingerprint);
+  }
+
+  async refreshReadiness(user: User, request: VoyaReadinessBuildRequest): Promise<VoyaReadinessResult> {
+    this.assertTripAccess(request.tripId, user.id);
+    const config = this.configResolver.resolve(user.id);
+    if (!config) throw new VoyaAiUnavailableError();
+
+    const context = this.readinessContext(request.tripId);
+    const fingerprint = readinessFingerprint(context);
+    const validDayIds = new Set(context.days.map((day) => day.dayId));
+    const validPlaceIds = new Set(context.days.flatMap((day) => day.stops.map((stop) => stop.placeId)));
+
+    let repair = '';
+    let generated: VoyaGeneratedReadinessItem[] = [];
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const raw = await this.generator.generate(config, {
+        system: READINESS_SYSTEM_PROMPT,
+        user: [
+          'Build a short Before You Go checklist from the stored trip facts below.',
+          JSON.stringify(context),
+          'Create 0-12 items only when there is a concrete action or verification step supported by those facts.',
+          'Do not add visa, passport, health, legal, border, weather, opening-hours, or live-availability claims.',
+          'Do not invent URLs, reservation confirmations, prices, or deadlines.',
+          'If a reservation is already confirmed, do not tell the traveler to reserve it again.',
+          'A Voya place note that says reservation may be worth checking can justify a Reserve or Verify task, but phrase it as a check, never as a claim of availability.',
+          'High means the trip could materially break if ignored; Medium means useful preparation; Low means convenience.',
+          'dayId and placeId may only use ids present in the supplied trip context; otherwise omit them.',
+          repair ? `Previous checklist failed validation. Fix: ${repair}` : '',
+        ].filter(Boolean).join('\n'),
+        jsonSchema: z.toJSONSchema(generatedReadinessSchema),
+      });
+
+      try {
+        const parsed = generatedReadinessSchema.parse(raw);
+        for (const item of parsed.items) {
+          if (item.dayId != null && !validDayIds.has(item.dayId)) {
+            throw new VoyaAiInvalidDraftError(`Unknown readiness dayId ${item.dayId}`);
+          }
+          if (item.placeId != null && !validPlaceIds.has(item.placeId)) {
+            throw new VoyaAiInvalidDraftError(`Unknown readiness placeId ${item.placeId}`);
+          }
+        }
+        generated = dedupeReadinessItems(parsed.items);
+        break;
+      } catch (error) {
+        if (attempt === 1) {
+          const detail = error instanceof Error ? error.message : 'unknown validation error';
+          throw new VoyaAiInvalidDraftError(`Voya could not build a safe readiness checklist: ${detail}`);
+        }
+        repair = this.validationMessage(error);
+      }
+    }
+
+    const existing = this.db.all<VoyaReadinessRow>(
+      'SELECT * FROM voya_readiness_items WHERE trip_id = ?',
+      request.tripId,
+    );
+    const statuses = new Map(existing.map((row) => [readinessIdentity(row.kind, row.title), row.status]));
+
+    this.db.transaction(() => {
+      this.db.run('DELETE FROM voya_readiness_items WHERE trip_id = ?', request.tripId);
+      const insert = this.db.prepare(
+        `INSERT INTO voya_readiness_items
+          (trip_id, title, kind, priority, status, reason, action_label, day_id, place_id, fingerprint, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+      );
+      for (const item of generated) {
+        insert.run(
+          request.tripId,
+          item.title,
+          item.kind,
+          item.priority,
+          statuses.get(readinessIdentity(item.kind, item.title)) ?? 'To do',
+          item.reason,
+          item.actionLabel ?? null,
+          item.dayId ?? null,
+          item.placeId ?? null,
+          fingerprint,
+        );
+      }
+    });
+
+    return this.getReadiness(user, request);
+  }
+
+  updateReadinessStatus(user: User, request: VoyaReadinessStatusRequest): VoyaReadinessResult {
+    this.assertTripAccess(request.tripId, user.id);
+    const row = this.db.get<{ id: number }>(
+      'SELECT id FROM voya_readiness_items WHERE id = ? AND trip_id = ?',
+      request.itemId,
+      request.tripId,
+    );
+    if (!row) throw new VoyaAiInvalidDraftError('Readiness item not found');
+
+    this.db.run(
+      'UPDATE voya_readiness_items SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND trip_id = ?',
+      request.status,
+      request.itemId,
+      request.tripId,
+    );
+    return this.getReadiness(user, { tripId: request.tripId });
+  }
+
+  private assertTripAccess(tripId: number, userId: number): void {
+    if (!this.db.canAccessTrip(tripId, userId)) throw new VoyaAiPermissionError('Trip not found');
+  }
+
+  private readinessContext(tripId: number) {
+    const trip = this.db.get<{
+      id: number; title: string; start_date: string | null; end_date: string | null; description: string | null;
+    }>('SELECT id, title, start_date, end_date, description FROM trips WHERE id = ?', tripId);
+    if (!trip) throw new VoyaAiPermissionError('Trip not found');
+
+    const days = this.days.list(tripId).days.map((day) => ({
+      dayId: day.id,
+      dayNumber: day.day_number ?? null,
+      date: day.date ?? null,
+      title: day.title ?? null,
+      notes: day.notes ?? null,
+      stops: (day.assignments || []).map((assignment) => ({
+        assignmentId: assignment.id,
+        placeId: assignment.place_id,
+        name: assignment.place?.name || '',
+        address: assignment.place?.address || null,
+        time: assignment.place?.place_time || null,
+        durationMin: assignment.place?.duration_minutes ?? null,
+        notes: assignment.place?.notes || assignment.notes || null,
+        reservationStatus: assignment.reservation_status || null,
+        reservationNotes: assignment.reservation_notes || null,
+        accommodationLinked: assignment.accommodation_id != null,
+      })),
+    }));
+
+    const reservations = this.db.all<{
+      id: number; title: string; type: string; status: string; reservation_time: string | null;
+      reservation_end_time: string | null; confirmation_number: string | null; location: string | null;
+      notes: string | null; needs_review?: number | null; day_id: number | null; place_id: number | null;
+    }>(
+      `SELECT id, title, type, status, reservation_time, reservation_end_time,
+              confirmation_number, location, notes, needs_review, day_id, place_id
+       FROM reservations WHERE trip_id = ? ORDER BY reservation_time, id`,
+      tripId,
+    );
+
+    const accommodations = this.db.all<{
+      id: number; place_id: number | null; place_name: string | null; start_day_id: number;
+      end_day_id: number; check_in: string | null; check_out: string | null; confirmation: string | null;
+    }>(
+      `SELECT a.id, a.place_id, p.name AS place_name, a.start_day_id, a.end_day_id,
+              a.check_in, a.check_out, a.confirmation
+       FROM day_accommodations a
+       LEFT JOIN places p ON p.id = a.place_id
+       WHERE a.trip_id = ? ORDER BY a.start_day_id, a.id`,
+      tripId,
+    );
+
+    return {
+      trip: {
+        id: trip.id,
+        title: trip.title,
+        startDate: trip.start_date,
+        endDate: trip.end_date,
+        description: trip.description,
+      },
+      days,
+      reservations,
+      accommodations,
+    };
   }
 
   async planTripEdit(user: User, request: VoyaTripEditRequest): Promise<VoyaTripEditPlan> {
@@ -869,4 +1057,88 @@ function providerSource(place: {
 
 function isVoyaSuggestion(notes: string | null | undefined): boolean {
   return /Suggested by Voya — verify current details before relying on them\./i.test(notes || '');
+}
+
+
+interface VoyaReadinessRow {
+  id: number;
+  trip_id: number;
+  title: string;
+  kind: 'Reserve' | 'Verify' | 'Transport' | 'Hotel' | 'Timing' | 'Document' | 'Other';
+  priority: 'High' | 'Medium' | 'Low';
+  status: 'To do' | 'Done' | 'Not needed';
+  reason: string;
+  action_label: string | null;
+  day_id: number | null;
+  place_id: number | null;
+  fingerprint: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const READINESS_SYSTEM_PROMPT = `You are Voya's trip-readiness assistant.
+Use only the supplied trip data.
+Create concrete preparation/checking tasks, not generic travel advice.
+Never invent legal requirements, visa rules, opening hours, live availability, prices, confirmations, URLs, deadlines, or policies.
+If the trip data does not support a task, omit it.
+Return only the requested structured checklist.`;
+
+function readinessIdentity(kind: string, title: string): string {
+  return `${kind}:${title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()}`;
+}
+
+function dedupeReadinessItems(items: VoyaGeneratedReadinessItem[]): VoyaGeneratedReadinessItem[] {
+  const seen = new Set<string>();
+  const out: VoyaGeneratedReadinessItem[] = [];
+  for (const item of items) {
+    const key = readinessIdentity(item.kind, item.title);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+function readinessFingerprint(value: unknown): string {
+  const input = JSON.stringify(value);
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function readinessResult(tripId: number, rows: VoyaReadinessRow[], currentFingerprint: string): VoyaReadinessResult {
+  const weights = { High: 3, Medium: 2, Low: 1 } as const;
+  let total = 0;
+  let complete = 0;
+  for (const row of rows) {
+    const weight = weights[row.priority];
+    total += weight;
+    if (row.status === 'Done' || row.status === 'Not needed') complete += weight;
+  }
+  const score = total === 0 ? 100 : Math.round((complete / total) * 100);
+  const storedFingerprint = rows[0]?.fingerprint ?? null;
+  return {
+    tripId,
+    score,
+    updatedAt: rows.reduce<string | null>((latest, row) => !latest || row.updated_at > latest ? row.updated_at : latest, null),
+    fingerprint: storedFingerprint,
+    stale: rows.length > 0 && storedFingerprint !== currentFingerprint,
+    items: rows.map((row) => ({
+      id: row.id,
+      tripId: row.trip_id,
+      title: row.title,
+      kind: row.kind,
+      priority: row.priority,
+      status: row.status,
+      reason: row.reason,
+      actionLabel: row.action_label ?? undefined,
+      dayId: row.day_id,
+      placeId: row.place_id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    })),
+  };
 }
