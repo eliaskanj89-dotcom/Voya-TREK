@@ -1438,6 +1438,30 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
     setExpandedRouteDayIds,
   } = S
 
+  useEffect(() => {
+    const onHealthRepair = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        tripId?: number
+        dayId?: number
+        category?: string
+        instruction?: string
+      }>).detail
+      if (detail?.tripId !== tripId || !detail.dayId) return
+      if (detail.category === 'Route') {
+        if (selectedDayId !== detail.dayId) onSelectDay(detail.dayId, false)
+        void handleOptimize(detail.dayId)
+        return
+      }
+      if (detail.category === 'Schedule') {
+        if (selectedDayId !== detail.dayId) onSelectDay(detail.dayId, false)
+        setVoyaEditSeed(detail.instruction || 'Make this day more realistic and fix its timing.')
+        setVoyaEditOpen(true)
+      }
+    }
+    window.addEventListener('voya:trip-health-repair', onHealthRepair)
+    return () => window.removeEventListener('voya:trip-health-repair', onHealthRepair)
+  }, [tripId, selectedDayId, onSelectDay, handleOptimize])
+
   // ── Per-segment / per-day travel mode (#1281) ──────────────────────────────
   // Icon per mode, matching the route picker (driving→Car, walking→Footprints,
   // any plugin profile→Zap).
