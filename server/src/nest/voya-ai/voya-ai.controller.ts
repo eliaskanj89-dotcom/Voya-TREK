@@ -3,7 +3,7 @@ import type { User } from '../../types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StructuredGenerationError } from './structured-generation.service';
-import { VoyaMaterializeDraftDto, VoyaPlanDraftDto, VoyaVerifyTripDto } from './voya-ai.dto';
+import { VoyaApplyDayEditDto, VoyaDayEditDto, VoyaMaterializeDraftDto, VoyaPlanDraftDto, VoyaVerifyTripDto } from './voya-ai.dto';
 import {
   VoyaAiInvalidDraftError,
   VoyaAiPermissionError,
@@ -29,6 +29,44 @@ export class VoyaAiController {
       }
       console.error('Voya AI materialization failed:', error instanceof Error ? error.message : 'unknown error');
       throw new HttpException({ error: 'Voya could not create this trip', code: 'VOYA_AI_MATERIALIZE_ERROR' }, 500);
+    }
+  }
+
+  @Post('day-edit-draft')
+  async dayEditDraft(@CurrentUser() user: User, @Body() body: VoyaDayEditDto) {
+    try {
+      return { draft: await this.voya.planDayEdit(user, body) };
+    } catch (error) {
+      if (error instanceof VoyaAiUnavailableError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_NOT_CONFIGURED' }, 409);
+      }
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_INVALID_DAY_EDIT' }, 502);
+      }
+      if (error instanceof StructuredGenerationError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_PROVIDER_ERROR' }, 502);
+      }
+      console.error('Voya day edit draft failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not redesign this day right now', code: 'VOYA_AI_DAY_EDIT_ERROR' }, 500);
+    }
+  }
+
+  @Post('apply-day-edit')
+  applyDayEdit(@CurrentUser() user: User, @Body() body: VoyaApplyDayEditDto) {
+    try {
+      return this.voya.applyDayEdit(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      if (error instanceof VoyaAiInvalidDraftError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_STALE_DAY_EDIT' }, 409);
+      }
+      console.error('Voya day edit apply failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not apply this day edit', code: 'VOYA_AI_APPLY_DAY_EDIT_ERROR' }, 500);
     }
   }
 
