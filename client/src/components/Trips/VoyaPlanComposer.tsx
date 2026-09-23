@@ -14,6 +14,7 @@ interface VoyaPlanComposerProps {
   currency: string
   travelers: number
   reminderDays: number
+  autoExpand?: boolean
   onCreated: (trip: Trip) => Promise<void> | void
 }
 
@@ -25,10 +26,11 @@ export default function VoyaPlanComposer({
   currency,
   travelers,
   reminderDays,
+  autoExpand = false,
   onCreated,
 }: VoyaPlanComposerProps) {
   const travelerDna = useSettingsStore(state => state.settings.voya_traveler_dna)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(autoExpand)
   const [destination, setDestination] = useState(initialDestination)
   const [pace, setPace] = useState<VoyaPlanDraftRequest['pace']>(travelerDna?.pace ?? 'balanced')
   const [budgetStyle, setBudgetStyle] = useState<VoyaPlanDraftRequest['budgetStyle']>(travelerDna?.budgetStyle ?? 'moderate')
@@ -39,6 +41,13 @@ export default function VoyaPlanComposer({
   const [generating, setGenerating] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (autoExpand && initialDestination.trim()) {
+      setDestination(initialDestination)
+      setExpanded(true)
+    }
+  }, [autoExpand, initialDestination])
 
   useEffect(() => {
     if (expanded || draft) return
