@@ -14,6 +14,7 @@ import MPlacesBrowser from './places/MPlacesBrowser'
 import MTripTabPanel from './tabs/MTripTabPanel'
 import MTripSheets from './sheets/MTripSheets'
 import MTripLoadingSplash from './MTripLoadingSplash'
+import MVoyaReadinessButton from './MVoyaReadinessButton'
 import { usePluginDayTints, dayTintBackground } from '../../../components/Plugins/PluginDaySchedule'
 import { stageOf } from '../../../components/Roadtrip/roadtripRowModel'
 import { badgeLabel, distanceBadge } from './roadtrip/stageBadges'
@@ -707,13 +708,18 @@ export default function MTripShell({
             not move or change shape when the tab does. The two views stay separate
             states: coupling them would drag one tab into the other's half. */}
         {MAP_TABS.has(trTab) ? (
-          <MIconBtn
-            ariaLabel={mapFront ? t('mobileTrip.listView') : t('mobileTrip.mapView')}
-            onClick={trTab === 'roadtrip' ? toggleRtView : toggleView}
-            className="backdrop-blur-[24px] backdrop-saturate-[1.7]"
-          >
-            {mapFront ? <List size={18} strokeWidth={2} /> : <MapIcon size={18} strokeWidth={2} />}
-          </MIconBtn>
+          <div className="flex flex-none items-center gap-2">
+            {trTab === 'plan' && (
+              <MVoyaReadinessButton tripId={tripId} onOpen={() => openSheet('readiness')} />
+            )}
+            <MIconBtn
+              ariaLabel={mapFront ? t('mobileTrip.listView') : t('mobileTrip.mapView')}
+              onClick={trTab === 'roadtrip' ? toggleRtView : toggleView}
+              className="backdrop-blur-[24px] backdrop-saturate-[1.7]"
+            >
+              {mapFront ? <List size={18} strokeWidth={2} /> : <MapIcon size={18} strokeWidth={2} />}
+            </MIconBtn>
+          </div>
         ) : (
           <span className="w-[38px] flex-none" />
         )}
