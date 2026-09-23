@@ -172,6 +172,13 @@ export const voyaTripEditPlanSchema = z.object({
 });
 export type VoyaTripEditPlan = z.infer<typeof voyaTripEditPlanSchema>;
 
+export const voyaApplyTripEditRequestSchema = z.object({
+  plan: voyaTripEditPlanSchema,
+  drafts: z.array(voyaDayEditDraftSchema).min(1).max(30),
+});
+export type VoyaApplyTripEditRequest = z.infer<typeof voyaApplyTripEditRequestSchema>;
+
+
 
 export const voyaTravelerDnaSchema = z.object({
   pace: z.enum(['relaxed', 'balanced', 'packed']).default('balanced'),
