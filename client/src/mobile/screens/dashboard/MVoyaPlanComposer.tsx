@@ -131,11 +131,13 @@ export default function MVoyaPlanComposer({
     try {
       if (multiDraft && multiRequest) {
         const result = await voyaAiApi.materializeMultiCityDraft({ request: multiRequest, draft: multiDraft, reminderDays: 0 })
+        startVoyaEnrichment(result.trip.id)
         await onCreated(result.trip)
         return
       }
       if (!draft || !request) return
       const result = await voyaAiApi.materializeDraft({ request, draft, reminderDays: 0 })
+      startVoyaEnrichment(result.trip.id)
       await onCreated(result.trip)
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Voya could not create this trip.'))
