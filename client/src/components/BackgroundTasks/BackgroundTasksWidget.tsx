@@ -152,17 +152,24 @@ export default function BackgroundTasksWidget() {
               {task.status === 'running' ? 'Voya is refining your trip' : task.status === 'done' ? 'Voya finished refining your trip' : 'Voya enrichment needs attention'}
             </div>
             <div style={{ fontSize: 'calc(11px * var(--fs-scale-caption, 1))', color: 'var(--text-faint)', marginTop: 2 }}>
-              {task.status === 'running' && 'Matching real places and optimizing route order…'}
+              {task.status === 'running' && 'Matching real places, optimizing route order and checking readiness…'}
               {task.status === 'done' && (
                 <>
                   {task.verified ?? 0} matched
                   {' · '}
                   {task.unresolved ?? 0} unresolved
                   {(task.optimizedDays ?? 0) > 0 ? ` · ${task.optimizedDays} day${task.optimizedDays === 1 ? '' : 's'} optimized` : ''}
+                  {task.readinessRefreshed ? ' · readiness refreshed' : ''}
+                  {typeof task.healthScore === 'number' ? ` · health ${task.healthScore}%` : ''}
                 </>
               )}
               {task.status === 'error' && task.error}
             </div>
+            {task.status === 'done' && task.healthLabel && (
+              <div style={{ marginTop: 5, display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '3px 8px', background: 'rgba(55,124,246,.08)', color: '#377CF6', fontSize: 'calc(10px * var(--fs-scale-caption, 1))', fontWeight: 700 }}>
+                Trip Health · {task.healthLabel}
+              </div>
+            )}
             {task.status === 'done' && (
               <button
                 type="button"
