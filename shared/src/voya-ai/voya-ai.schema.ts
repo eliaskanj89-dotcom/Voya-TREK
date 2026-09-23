@@ -185,3 +185,50 @@ export const voyaTravelerDnaSchema = z.object({
 export type VoyaTravelerDna = z.infer<typeof voyaTravelerDnaSchema>;
 
 export const DEFAULT_VOYA_TRAVELER_DNA: VoyaTravelerDna = voyaTravelerDnaSchema.parse({});
+
+
+export const voyaReadinessKindSchema = z.enum(['Reserve', 'Verify', 'Transport', 'Hotel', 'Timing', 'Document', 'Other']);
+export const voyaReadinessPrioritySchema = z.enum(['High', 'Medium', 'Low']);
+export const voyaReadinessStatusSchema = z.enum(['To do', 'Done', 'Not needed']);
+
+export const voyaGeneratedReadinessItemSchema = z.object({
+  title: z.string().trim().min(1).max(180),
+  kind: voyaReadinessKindSchema,
+  priority: voyaReadinessPrioritySchema,
+  reason: z.string().trim().min(1).max(500),
+  actionLabel: z.string().trim().max(120).optional(),
+  dayId: z.number().int().positive().nullable().optional(),
+  placeId: z.number().int().positive().nullable().optional(),
+});
+export type VoyaGeneratedReadinessItem = z.infer<typeof voyaGeneratedReadinessItemSchema>;
+
+export const voyaReadinessBuildRequestSchema = z.object({
+  tripId: z.number().int().positive(),
+});
+export type VoyaReadinessBuildRequest = z.infer<typeof voyaReadinessBuildRequestSchema>;
+
+export const voyaReadinessItemSchema = voyaGeneratedReadinessItemSchema.extend({
+  id: z.number().int().positive(),
+  tripId: z.number().int().positive(),
+  status: voyaReadinessStatusSchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type VoyaReadinessItem = z.infer<typeof voyaReadinessItemSchema>;
+
+export const voyaReadinessResultSchema = z.object({
+  tripId: z.number().int().positive(),
+  score: z.number().int().min(0).max(100),
+  updatedAt: z.string().nullable(),
+  fingerprint: z.string().nullable(),
+  stale: z.boolean(),
+  items: z.array(voyaReadinessItemSchema),
+});
+export type VoyaReadinessResult = z.infer<typeof voyaReadinessResultSchema>;
+
+export const voyaReadinessStatusRequestSchema = z.object({
+  tripId: z.number().int().positive(),
+  itemId: z.number().int().positive(),
+  status: voyaReadinessStatusSchema,
+});
+export type VoyaReadinessStatusRequest = z.infer<typeof voyaReadinessStatusRequestSchema>;
