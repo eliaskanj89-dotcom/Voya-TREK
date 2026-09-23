@@ -8,9 +8,10 @@ import { DaysModule } from '../days/days.module';
 import { PlacesModule } from '../places/places.module';
 import { AssignmentsDomainModule } from '../assignments/assignments-domain.module';
 import { MapsModule } from '../maps/maps.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
-  imports: [LlmParseModule, TripsModule, DaysModule, PlacesModule, AssignmentsDomainModule, MapsModule],
+  imports: [LlmParseModule, TripsModule, DaysModule, PlacesModule, AssignmentsDomainModule, MapsModule, SettingsModule],
   controllers: [VoyaAiController],
   providers: [StructuredGenerationService, VoyaAiService],
   exports: [VoyaAiService],
