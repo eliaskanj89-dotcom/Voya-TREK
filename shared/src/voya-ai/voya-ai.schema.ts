@@ -235,3 +235,41 @@ export const voyaReadinessStatusRequestSchema = z.object({
   status: voyaReadinessStatusSchema,
 });
 export type VoyaReadinessStatusRequest = z.infer<typeof voyaReadinessStatusRequestSchema>;
+
+
+export const voyaDestinationDiscoveryRequestSchema = z.object({
+  days: z.number().int().min(2).max(30).default(7),
+  budgetStyle: z.enum(['budget', 'moderate', 'premium', 'luxury']).default('moderate'),
+  climate: z.enum(['any', 'warm', 'mild', 'cool']).default('any'),
+  travelStyle: z.enum(['balanced', 'culture', 'food', 'nature', 'beach', 'city', 'nightlife', 'slow']).default('balanced'),
+  month: z.number().int().min(1).max(12).optional(),
+  interests: z.array(z.string().trim().min(1).max(60)).max(10).default([]),
+  travelEffort: z.enum(['easy', 'open', 'adventurous']).default('open'),
+  notes: z.string().trim().max(1000).optional(),
+});
+export type VoyaDestinationDiscoveryRequest = z.infer<typeof voyaDestinationDiscoveryRequestSchema>;
+
+export const voyaDestinationSuggestionSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  country: z.string().trim().min(1).max(100),
+  type: z.enum(['City', 'Country', 'Island', 'Region', 'Town', 'Other']),
+  fitSummary: z.string().trim().min(1).max(420),
+  whyFit: z.array(z.string().trim().min(1).max(180)).min(2).max(4),
+  vibe: z.array(z.string().trim().min(1).max(40)).min(2).max(5),
+  budgetBand: z.enum(['budget', 'moderate', 'premium', 'luxury', 'mixed']),
+  climateNote: z.string().trim().min(1).max(220),
+  highlights: z.array(z.string().trim().min(1).max(120)).min(2).max(5),
+  tradeoffs: z.array(z.string().trim().min(1).max(180)).max(3).default([]),
+  searchTerm: z.string().trim().min(1).max(180),
+});
+export type VoyaDestinationSuggestion = z.infer<typeof voyaDestinationSuggestionSchema>;
+
+export const voyaDestinationDiscoveryResultSchema = z.object({
+  summary: z.string().trim().min(1).max(700),
+  suggestions: z.array(voyaDestinationSuggestionSchema).min(6).max(8),
+  generatedBy: z.object({
+    provider: z.enum(['local', 'openai', 'anthropic']),
+    model: z.string().min(1),
+  }),
+});
+export type VoyaDestinationDiscoveryResult = z.infer<typeof voyaDestinationDiscoveryResultSchema>;
