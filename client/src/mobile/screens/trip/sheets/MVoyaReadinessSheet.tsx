@@ -4,7 +4,7 @@ import type { VoyaReadinessItem, VoyaReadinessResult, VoyaReadinessStatus } from
 import MSheet from '../../../components/MSheet'
 import { TileHeader, INNER_CLS } from './MTripSheetUi'
 import type { MTripSheetsProps } from '../MTripShell'
-import { voyaAiApi } from '../../../../api/client'
+import { todoApi, voyaAiApi } from '../../../../api/client'
 
 export default function MVoyaReadinessSheet({ planner, shell }: MTripSheetsProps) {
   const open = shell.sheet?.id === 'readiness'
@@ -20,7 +20,18 @@ export default function MVoyaReadinessSheet({ planner, shell }: MTripSheetsProps
     if (!open) return
     setLoading(true)
     try {
-      setData(await voyaAiApi.readiness({ tripId: planner.tripId }))
+      const [readiness, todos] = await Promise.all([
+        voyaAiApi.readiness({ tripId: planner.tripId }),
+        todoApi.list(planner.tripId).catch(() => ({ items: [] })),
+      ])
+      setData(readiness)
+      const linked = new Set<number>()
+      for (const task of todos?.items || []) {
+        const description = typeof task?.description === 'string' ? task.description : ''
+        const match = description.match(/\[voya-readiness:(\d+)\]/)
+        if (match) linked.add(Number(match[1]))
+      }
+      setTaskItemIds(linked)
       setError('')
     } catch {
       setError('Voya could not load trip readiness.')
