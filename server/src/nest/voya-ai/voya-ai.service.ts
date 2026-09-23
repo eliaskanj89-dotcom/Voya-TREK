@@ -174,7 +174,7 @@ export class VoyaAiService {
     if (!trip) throw new VoyaAiPermissionError('Trip not found');
     if (!this.places.canEdit(trip, user)) throw new VoyaAiPermissionError('No permission to update trip places');
 
-    const rows = this.places.list(String(tripId), { assignment: 'all' });
+    const rows = this.places.list(String(tripId), { assignment: 'all' }).filter(place => isVoyaSuggestion(place.notes));
     const items: VoyaVerifyTripResult['items'] = [];
     const sourceCounts: Record<string, number> = {};
     let verified = 0;
@@ -488,4 +488,9 @@ function providerSource(place: {
   if (place.osm_id) return 'openstreetmap';
   if (place.amap_poi_id) return 'amap';
   return null;
+}
+
+
+function isVoyaSuggestion(notes: string | null | undefined): boolean {
+  return /Suggested by Voya — verify current details before relying on them\./i.test(notes || '');
 }
