@@ -3,6 +3,8 @@ import {
   type VoyaMaterializeDraftRequest,
   type VoyaPlanDraftRequest,
   type VoyaPlanDraftResponse,
+  type VoyaVerifyTripRequest,
+  type VoyaVerifyTripResult,
   voyaPlanDraftResponseSchema,
 } from '@trek/shared';
 import { z } from 'zod';
@@ -14,6 +16,7 @@ import { TripsService } from '../trips/trips.service';
 import { DaysService } from '../days/days.service';
 import { PlacesService } from '../places/places.service';
 import { AssignmentsService } from '../assignments/assignments.service';
+import { MapsService } from '../maps/maps.service';
 
 const generatedPlanSchema = voyaPlanDraftResponseSchema.omit({ generatedBy: true });
 
@@ -48,6 +51,7 @@ export class VoyaAiService {
     private readonly days: DaysService,
     private readonly places: PlacesService,
     private readonly assignments: AssignmentsService,
+    private readonly maps: MapsService,
   ) {}
 
   async planDraft(userId: number, request: VoyaPlanDraftRequest): Promise<VoyaPlanDraftResponse> {
@@ -164,6 +168,142 @@ export class VoyaAiService {
     });
   }
 
+  async verifyTrip(user: User, request: VoyaVerifyTripRequest): Promise<VoyaVerifyTripResult> {
+    const tripId = request.tripId;
+    const trip = this.places.verifyTripAccess(String(tripId), user.id);
+    if (!trip) throw new VoyaAiPermissionError('Trip not found');
+    if (!this.places.canEdit(trip, user)) throw new VoyaAiPermissionError('No permission to update trip places');
+
+    const rows = this.places.list(String(tripId), { assignment: 'all' });
+    const items: VoyaVerifyTripResult['items'] = [];
+    const sourceCounts: Record<string, number> = {};
+    let verified = 0;
+    let unresolved = 0;
+    let skipped = 0;
+
+    for (const place of rows) {
+      const providerId = place.google_place_id || place.osm_id || place.amap_poi_id;
+      if (providerId) {
+        skipped++;
+        items.push({
+          placeId: place.id,
+          name: place.name,
+          status: 'already_verified',
+          source: providerSource(place),
+          matchedName: place.name,
+          reason: 'This place already carries a provider identity.',
+        });
+        continue;
+      }
+
+      const destination = request.destination || destinationFromNotes(place.notes) || '';
+      const query = [place.name, destination].filter(Boolean).join(', ');
+
+      try {
+        const search = await this.maps.searchPlaces(user.id, query, request.lang);
+        const match = pickStrongPlaceMatch(place.name, destination, search.places);
+        if (!match) {
+          unresolved++;
+          items.push({
+            placeId: place.id,
+            name: place.name,
+            status: 'unresolved',
+            source: search.source || null,
+            matchedName: null,
+            reason: destination
+              ? 'No exact provider-name match in the expected destination.'
+              : 'No exact provider-name match with enough location context.',
+          });
+          continue;
+        }
+
+        const fields = providerFields(match);
+        if (fields.lat == null || fields.lng == null) {
+          unresolved++;
+          items.push({
+            placeId: place.id,
+            name: place.name,
+            status: 'unresolved',
+            source: search.source || readString(match.source),
+            matchedName: readString(match.name),
+            reason: 'The provider result had no usable coordinates.',
+          });
+          continue;
+        }
+
+        const source = readString(match.source) || search.source || 'map provider';
+        const verificationNote = [
+          `Matched by Voya to a ${source} place record on ${new Date().toISOString().slice(0, 10)}.`,
+          'Current hours, prices and availability still require checking.',
+          stripVoyaSuggestionPrefix(place.notes),
+        ].filter(Boolean).join(' ');
+
+        let updated = await this.places.update(String(tripId), String(place.id), {
+          ...fields,
+          notes: verificationNote,
+        });
+
+        if (!updated || ('conflict' in updated)) {
+          throw new Error('Place changed while Voya was verifying it');
+        }
+
+        const matchedProviderId =
+          fields.google_place_id || fields.osm_id || fields.amap_poi_id || fields.google_ftid || '';
+        if (!place.image_url && matchedProviderId) {
+          try {
+            const photo = await this.maps.photo(
+              user.id,
+              matchedProviderId,
+              fields.lat,
+              fields.lng,
+              readString(match.name) || place.name,
+            );
+            if (photo.photoUrl) {
+              const withPhoto = await this.places.update(String(tripId), String(place.id), {
+                image_url: photo.photoUrl,
+              });
+              if (withPhoto && !('conflict' in withPhoto)) updated = withPhoto;
+            }
+          } catch {
+            // Photo enrichment is optional; identity verification has already succeeded.
+          }
+        }
+
+        this.places.broadcast(String(tripId), 'place:updated', { place: updated }, undefined);
+        verified++;
+        sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+        items.push({
+          placeId: place.id,
+          name: place.name,
+          status: 'verified',
+          source,
+          matchedName: readString(match.name) || place.name,
+          reason: 'Exact provider name and destination context matched.',
+        });
+      } catch (error) {
+        unresolved++;
+        items.push({
+          placeId: place.id,
+          name: place.name,
+          status: 'error',
+          source: null,
+          matchedName: null,
+          reason: error instanceof Error ? error.message : 'Provider verification failed.',
+        });
+      }
+    }
+
+    return {
+      tripId,
+      checked: rows.length - skipped,
+      verified,
+      unresolved,
+      skipped,
+      sourceCounts,
+      items,
+    };
+  }
+
   private userPrompt(request: VoyaPlanDraftRequest, repair: string): string {
     const interests = request.interests.length ? request.interests.join(', ') : 'general discovery, food, culture and local character';
     return [
@@ -265,3 +405,87 @@ Accuracy and trust are more important than false precision.
 Never invent real-time availability, exact prices, opening hours, or reservation confirmation.
 Never present an unverified suggestion as verified.
 Return only the requested structured itinerary object.`;
+
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function providerFields(record: Record<string, unknown>) {
+  return {
+    name: readString(record.name),
+    lat: readNumber(record.lat),
+    lng: readNumber(record.lng),
+    address: readString(record.address),
+    website: readString(record.website),
+    phone: readString(record.phone),
+    google_place_id: readString(record.google_place_id),
+    google_ftid: readString(record.google_ftid),
+    osm_id: readString(record.osm_id),
+    amap_poi_id: readString(record.amap_poi_id),
+  };
+}
+
+function normalizeIdentity(value: string): string {
+  return value
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function destinationTokens(value: string): string[] {
+  return normalizeIdentity(value)
+    .split(' ')
+    .filter(token => token.length >= 3);
+}
+
+function pickStrongPlaceMatch(
+  expectedName: string,
+  destination: string,
+  candidates: Record<string, unknown>[],
+): Record<string, unknown> | null {
+  const expected = normalizeIdentity(expectedName);
+  const destTokens = destinationTokens(destination);
+
+  for (const candidate of candidates) {
+    const name = readString(candidate.name);
+    if (!name || normalizeIdentity(name) !== expected) continue;
+
+    if (destTokens.length === 0) return null;
+    const address = normalizeIdentity(readString(candidate.address) || '');
+    if (!address) continue;
+    if (destTokens.some(token => address.includes(token))) return candidate;
+  }
+
+  return null;
+}
+
+function destinationFromNotes(notes: string | null | undefined): string | null {
+  if (!notes) return null;
+  const match = notes.match(/Voya destination:\s*([^.]*)\./i);
+  return match?.[1]?.trim() || null;
+}
+
+function stripVoyaSuggestionPrefix(notes: string | null | undefined): string {
+  return (notes || '')
+    .replace(/Suggested by Voya — verify current details before relying on them\.\s*/i, '')
+    .replace(/Voya destination:\s*[^.]*\.\s*/i, '')
+    .trim();
+}
+
+function providerSource(place: {
+  google_place_id?: string | null;
+  osm_id?: string | null;
+  amap_poi_id?: string | null;
+}): string | null {
+  if (place.google_place_id) return 'google';
+  if (place.osm_id) return 'openstreetmap';
+  if (place.amap_poi_id) return 'amap';
+  return null;
+}
