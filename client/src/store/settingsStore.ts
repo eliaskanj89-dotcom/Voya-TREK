@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { settingsApi } from '../api/client'
 import type { Settings } from '../types'
-import { DEFAULT_APPEARANCE, DEFAULT_VOYA_TRAVELER_DNA } from '@trek/shared'
+import { DEFAULT_APPEARANCE } from '@trek/shared'
 import { getApiErrorMessage } from '../types'
 import { SUPPORTED_LANGUAGE_CODES } from '../i18n/supportedLanguages'
 import { normalizeTileUrl, stripTileApiKey } from '../utils/tileUrl'
@@ -100,7 +100,6 @@ export const DEFAULT_SETTINGS: Settings = {
   start_page: DEFAULT_START_PAGE,
   start_trip_tab: DEFAULT_START_TRIP_TAB,
   appearance: DEFAULT_APPEARANCE,
-  voya_traveler_dna: DEFAULT_VOYA_TRAVELER_DNA,
   // dashboard_timezones is intentionally left unset so the widget can tell "never
   // chosen" (fall back to home + defaults) from an explicitly emptied list.
 }

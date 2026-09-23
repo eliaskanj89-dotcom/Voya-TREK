@@ -18,7 +18,7 @@ export function RouteConnector({ seg, profile }: { seg: RouteSegment; profile: s
   const Icon = profileIcon(effProfile)
   const line = { flex: 1, height: 1, minHeight: 1, alignSelf: 'center', background: 'var(--border-primary)' }
   return (
-    <div className="voya-route-connector" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 14px', fontSize: 'calc(10.5px * var(--fs-scale-caption, 1))', color: 'var(--text-faint)', lineHeight: 1.2 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 14px', fontSize: 'calc(10.5px * var(--fs-scale-caption, 1))', color: 'var(--text-faint)', lineHeight: 1.2 }}>
       <div style={line} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
         <Icon size={11} strokeWidth={2} />
@@ -85,7 +85,7 @@ export function HotelRouteConnector({
     </div>
   )
   return (
-    <div className="voya-hotel-route-connector" style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: placement === 'top' ? '2px 0 6px' : '6px 0 2px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: placement === 'top' ? '2px 0 6px' : '6px 0 2px' }}>
       {placement === 'top' ? (
         <>
           {hotelRow}

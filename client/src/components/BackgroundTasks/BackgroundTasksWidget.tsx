@@ -1,13 +1,12 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Loader2, CheckCircle2, AlertCircle, Sparkles, X } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { addListener, removeListener } from '../../api/websocket'
 import { reservationsApi, healthApi } from '../../api/client'
 import { saveImportFiles } from '../../db/offlineDb'
 import { useBackgroundTasksStore, type BackgroundImportTask } from '../../store/backgroundTasksStore'
-import { resumeVoyaEnrichment } from '../../services/voyaEnrichment'
 
 /**
  * Global, route-independent widget (bottom-right) that tracks background booking
@@ -20,13 +19,11 @@ export default function BackgroundTasksWidget() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const tasks = useBackgroundTasksStore((s) => s.tasks)
-  const voyaTasks = useBackgroundTasksStore((s) => s.voyaTasks)
   const setProgress = useBackgroundTasksStore((s) => s.setProgress)
   const setDone = useBackgroundTasksStore((s) => s.setDone)
   const setError = useBackgroundTasksStore((s) => s.setError)
   const requestReview = useBackgroundTasksStore((s) => s.requestReview)
   const dismiss = useBackgroundTasksStore((s) => s.dismiss)
-  const dismissVoya = useBackgroundTasksStore((s) => s.dismissVoya)
   const addTask = useBackgroundTasksStore((s) => s.addTask)
 
   const [aiParsing, setAiParsing] = useState(false)
@@ -64,8 +61,7 @@ export default function BackgroundTasksWidget() {
   useEffect(() => {
     if (didRehydrate.current) return
     didRehydrate.current = true
-    const restoredState = useBackgroundTasksStore.getState()
-    const restored = restoredState.tasks
+    const restored = useBackgroundTasksStore.getState().tasks
     for (const task of restored) {
       reservationsApi
         .importJobStatus(task.tripId, task.id)
@@ -78,19 +74,6 @@ export default function BackgroundTasksWidget() {
           if (err?.response?.status === 404) dismiss(task.id)
         })
     }
-
-    // Voya refinement is client-orchestrated but idempotent. If the browser was
-    // reloaded mid-run, restart the same task id instead of silently abandoning it.
-    for (const task of restoredState.voyaTasks) {
-      if (task.status !== 'running') continue
-      const numericTripId = Number(task.tripId)
-      if (!Number.isFinite(numericTripId) || numericTripId <= 0) {
-        useBackgroundTasksStore.getState().setVoyaError(task.id, 'Voya could not resume this refinement task.')
-        continue
-      }
-      resumeVoyaEnrichment(task.id, numericTripId)
-    }
-
     // run once on mount against whatever was rehydrated from storage
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -139,7 +122,7 @@ export default function BackgroundTasksWidget() {
     return () => clearInterval(iv)
   }, [tasks, setProgress, setDone, setError, t])
 
-  if (tasks.length === 0 && voyaTasks.length === 0) return null
+  if (tasks.length === 0) return null
 
   const review = (task: BackgroundImportTask) => {
     requestReview(task.id)
@@ -150,70 +133,6 @@ export default function BackgroundTasksWidget() {
     <div
       style={{ position: 'fixed', right: 16, bottom: 16, zIndex: 50000, display: 'flex', flexDirection: 'column', gap: 8, width: 380, maxWidth: 'calc(100vw - 32px)', fontFamily: 'var(--font-system)' }}
     >
-      {voyaTasks.map((task) => (
-        <div
-          key={task.id}
-          className="voya-glass"
-          style={{ borderRadius: 18, padding: '12px 13px', display: 'flex', gap: 10, alignItems: 'flex-start' }}
-        >
-          <div style={{ flexShrink: 0, marginTop: 1 }}>
-            {task.status === 'running' && <Sparkles size={16} className="animate-pulse" color="#377CF6" />}
-            {task.status === 'done' && <CheckCircle2 size={16} color="#10b981" />}
-            {task.status === 'error' && <AlertCircle size={16} color="#ef4444" />}
-          </div>
-
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="voya-editorial" style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {task.status === 'running' ? 'Voya is refining your trip' : task.status === 'done' ? 'Voya finished refining your trip' : 'Voya enrichment needs attention'}
-            </div>
-            <div style={{ fontSize: 'calc(11px * var(--fs-scale-caption, 1))', color: 'var(--text-faint)', marginTop: 2 }}>
-              {task.status === 'running' && 'Matching real places, optimizing route order and checking readiness…'}
-              {task.status === 'done' && (
-                <>
-                  {task.verified ?? 0} matched
-                  {' · '}
-                  {task.unresolved ?? 0} unresolved
-                  {(task.optimizedDays ?? 0) > 0 ? ` · ${task.optimizedDays} day${task.optimizedDays === 1 ? '' : 's'} optimized` : ''}
-                  {task.readinessRefreshed ? ' · readiness refreshed' : ''}
-                  {typeof task.healthScore === 'number' ? ` · health ${task.healthScore}%` : ''}
-                </>
-              )}
-              {task.status === 'error' && task.error}
-            </div>
-            {task.status === 'done' && task.healthLabel && (
-              <div style={{ marginTop: 5, display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '3px 8px', background: 'rgba(55,124,246,.08)', color: '#377CF6', fontSize: 'calc(10px * var(--fs-scale-caption, 1))', fontWeight: 700 }}>
-                Trip Health · {task.healthLabel}
-              </div>
-            )}
-            {task.status === 'done' && (
-              <button
-                type="button"
-                onClick={() => {
-                  dismissVoya(task.id)
-                  navigate(`/trips/${task.tripId}`)
-                }}
-                className="bg-accent text-accent-text"
-                style={{ marginTop: 6, border: 'none', borderRadius: 999, padding: '5px 11px', fontSize: 'calc(11px * var(--fs-scale-caption, 1))', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-              >
-                Open trip
-              </button>
-            )}
-          </div>
-
-          {task.status !== 'running' && (
-            <button
-              type="button"
-              onClick={() => dismissVoya(task.id)}
-              className="bg-transparent text-content-faint"
-              style={{ flexShrink: 0, border: 'none', cursor: 'pointer', padding: 2, borderRadius: 6, display: 'flex', alignItems: 'center' }}
-              aria-label={t('common.close')}
-            >
-              <X size={13} />
-            </button>
-          )}
-        </div>
-      ))}
-
       {tasks.map((task) => (
         <div
           key={task.id}

@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
-import type { TrekScene, TrekMood } from '../../mobile/components/MDancingTrek'
+import MDancingTrek, { type TrekScene, type TrekMood } from '../../mobile/components/MDancingTrek'
 
 /**
  * The one desktop empty state: the TREK mascot acting out the page's scene with
@@ -68,15 +68,7 @@ export default function EmptyState({
       className={`${layoutClasses} ${className}`}
       style={{ '--m-ink': 'var(--text-primary)', '--m-bg': surface } as CSSProperties}
     >
-      <div
-        aria-hidden="true"
-        className="voya-empty-orb flex items-center justify-center rounded-full"
-        data-scene={scene}
-        data-mood={mood || 'default'}
-        style={{ width: size, height: size }}
-      >
-        <span className="voya-wordmark text-white" style={{ fontSize: Math.max(22, size * 0.34) }}>V</span>
-      </div>
+      <MDancingTrek scene={scene} mood={mood} size={size} />
       <p className={compact ? 'text-caption text-content-muted' : 'text-[15px] font-semibold text-content-secondary'}>{title}</p>
       {action}
     </div>

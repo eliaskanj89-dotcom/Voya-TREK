@@ -175,7 +175,8 @@ export default function MBottomNav() {
 
         {logoSlot ? (
           <span aria-hidden="true" className="mx-2 flex h-14 w-14 flex-none items-center justify-center rounded-full bg-[color:var(--m-ic)] opacity-70">
-            <span className="voya-wordmark text-[20px] text-[#377CF6] dark:text-[#79AEFF]">V</span>
+            <img src="/icons/icon-dark.svg" alt="" className="block h-6 w-6 opacity-75 dark:hidden" />
+            <img src="/icons/icon-white.svg" alt="" className="hidden h-6 w-6 opacity-75 dark:block" />
           </span>
         ) : screenFabSlot ? (
           // Same box as MFab (56px, flex-none, mx-2) so both tab groups keep

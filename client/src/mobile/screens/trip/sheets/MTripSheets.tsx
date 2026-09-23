@@ -23,7 +23,6 @@ import MNoteSheet, { type MNoteSheetPayload } from './MNoteSheet'
 import MImportSheet from './MImportSheet'
 import MExportSheet from './MExportSheet'
 import MMehrSheet from './MMehrSheet'
-import MVoyaReadinessSheet from './MVoyaReadinessSheet'
 import MRtStopSheet from '../roadtrip/MRtStopSheet'
 import MRtStaySheet from '../roadtrip/MRtStaySheet'
 import MRtKindSheet from '../roadtrip/MRtKindSheet'
@@ -70,7 +69,6 @@ export default function MTripSheets({ planner, shell }: MTripSheetsProps) {
       <MTransportSheet planner={planner} shell={shell} />
       <MBrowseActionsSheet planner={planner} shell={shell} />
       <MMehrSheet planner={planner} shell={shell} />
-      <MVoyaReadinessSheet planner={planner} shell={shell} />
       {/* The stage's own sheets. Each one checks shell.sheet?.id itself, the draft
           sheet hangs off planner.stopDraft the way the place editor hangs off its flag. */}
       <MRtStopSheet planner={planner} shell={shell} />

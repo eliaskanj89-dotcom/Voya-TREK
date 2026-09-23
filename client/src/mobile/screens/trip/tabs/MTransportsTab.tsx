@@ -1,13 +1,11 @@
-import { useMemo, useState } from 'react'
-import { Car, FileText, Pencil, Sparkles, TrainFront, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { FileText, Pencil, Trash2 } from 'lucide-react'
+import MDancingTrek from '../../../components/MDancingTrek'
 import { RES_ICONS } from '../../../../components/Planner/DayPlanSidebar.constants'
 import { splitReservationDateTime, formatTime, cleanAmountText } from '../../../../utils/formatters'
 import { openFile } from '../../../../utils/fileDownload'
 import { useTranslation } from '../../../../i18n'
-import type { VoyaTransportAdviceResult } from '@trek/shared'
 import type { Reservation } from '../../../../types'
-import { voyaAiApi } from '../../../../api/client'
-import { voyaJourneySegments } from '../../../../components/Planner/VoyaJourneyStrip'
 import MConfirmSheet from '../../settings/MConfirmSheet'
 import { ConfirmationCode, Field, ReservationPluginSlots, SectionHeader, StatusDot, TabScroller, TravelerAvatars, TravelerFilterRow } from './tabChrome'
 import { STATUS_COLOR, type MTabScreenProps } from './tabModel'
@@ -29,44 +27,6 @@ import {
 export default function MTransportsTab({ planner, shell }: MTabScreenProps) {
   const { t, reservations, days } = planner
   const [travelerFilter, setTravelerFilter] = useState<Set<number>>(new Set())
-  const journeySegments = useMemo(() => voyaJourneySegments(days), [days])
-  const [voyaAdviceLoading, setVoyaAdviceLoading] = useState<string | null>(null)
-  const [voyaAdvice, setVoyaAdvice] = useState<VoyaTransportAdviceResult | null>(null)
-  const [voyaAdviceError, setVoyaAdviceError] = useState('')
-
-  const compareTransfer = async (index: number) => {
-    if (index <= 0 || index >= journeySegments.length) return
-    const from = journeySegments[index - 1]
-    const to = journeySegments[index]
-    const key = `${from.destination}->${to.destination}`
-    setVoyaAdviceLoading(key)
-    setVoyaAdvice(null)
-    setVoyaAdviceError('')
-    try {
-      const result = await voyaAiApi.transportAdvice({
-        tripId: planner.tripId,
-        dayId: to.firstDayId,
-        origin: [from.destination, from.country].filter(Boolean).join(', '),
-        destination: [to.destination, to.country].filter(Boolean).join(', '),
-        departureDate: to.firstDayDate,
-      })
-      setVoyaAdvice(result)
-    } catch {
-      setVoyaAdviceError('Voya could not compare this transfer right now.')
-    } finally {
-      setVoyaAdviceLoading(null)
-    }
-  }
-
-  const addTransportForAdvice = () => {
-    if (!voyaAdvice) return
-    const destinationName = voyaAdvice.destination.split(',')[0]?.trim().toLowerCase()
-    const segment = journeySegments.find(item => item.destination.toLowerCase() === destinationName)
-    if (!segment) return
-    planner.setEditingTransport(null)
-    planner.setTransportModalDayId(segment.firstDayId)
-    planner.setShowTransportModal(true)
-  }
   const allTransports = reservations.filter(r => planner.TRANSPORT_TYPES.has(r.type))
   const transports = travelerFilter.size === 0 ? allTransports : allTransports.filter(r => (r.travelers || []).some(tv => travelerFilter.has(tv.user_id)))
   const groups = groupTransports(transports, days)
@@ -85,93 +45,6 @@ export default function MTransportsTab({ planner, shell }: MTabScreenProps) {
 
   return (
     <TabScroller>
-      {journeySegments.length > 1 && (
-        <section className="voya-mobile-transfer-intelligence mx-3 mt-2 rounded-[22px] border border-[color:var(--m-rowbr)] bg-[color:var(--m-glass)] p-3.5 backdrop-blur-[24px]">
-          <div className="flex items-start gap-3">
-            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-m-act text-m-actfg shadow-[0_8px_20px_rgba(55,124,246,.24)]">
-              <Sparkles size={15} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[0.8125rem] font-semibold text-m-ink">Voya transfer intelligence</div>
-              <p className="mt-0.5 font-geist text-[0.65625rem] leading-relaxed text-m-muted">
-                Compare real scheduled transit with TREK road routing between your cities.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {journeySegments.slice(1).map((segment, offset) => {
-              const index = offset + 1
-              const previous = journeySegments[index - 1]
-              const key = `${previous.destination}->${segment.destination}`
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => { void compareTransfer(index) }}
-                  className="flex flex-none items-center gap-1.5 rounded-full border border-[color:var(--m-rowbr)] bg-m-card px-3 py-2 font-geist text-[0.625rem] font-semibold text-m-muted"
-                >
-                  {voyaAdviceLoading === key
-                    ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-m-act/30 border-t-m-act" />
-                    : <TrainFront size={12} className="text-m-act" />}
-                  {previous.destination} → {segment.destination}
-                </button>
-              )
-            })}
-          </div>
-
-          {voyaAdviceError && (
-            <div className="mt-3 rounded-[14px] bg-[rgba(220,65,65,.08)] px-3 py-2 font-geist text-[0.625rem] leading-relaxed text-[color:var(--m-st-danger)]">
-              {voyaAdviceError}
-            </div>
-          )}
-
-          {voyaAdvice && (
-            <div className="mt-3 space-y-2">
-              {voyaAdvice.options.slice(0, 3).map(option => (
-                <div
-                  key={option.id}
-                  className={`rounded-[16px] border px-3 py-2.5 ${
-                    option.recommended
-                      ? 'border-m-act/25 bg-[rgba(55,124,246,.08)]'
-                      : 'border-[color:var(--m-rowbr)] bg-m-card'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      {option.mode === 'drive'
-                        ? <Car size={13} className="flex-none text-m-act" />
-                        : <TrainFront size={13} className="flex-none text-m-act" />}
-                      <span className="truncate text-[0.6875rem] font-semibold text-m-ink">{option.label}</span>
-                      {option.recommended && (
-                        <span className="rounded-full bg-m-act px-1.5 py-[2px] font-geist text-[0.46875rem] font-bold uppercase tracking-[.05em] text-m-actfg">
-                          Pick
-                        </span>
-                      )}
-                    </div>
-                    <span className="flex-none font-geist text-[0.625rem] font-semibold text-m-ink">{option.durationLabel}</span>
-                  </div>
-                  <div className="mt-1 font-geist text-[0.5625rem] leading-relaxed text-m-faint">
-                    {[option.departurePoint && option.arrivalPoint ? `${option.departurePoint} → ${option.arrivalPoint}` : '', option.transfers != null ? `${option.transfers} transfer${option.transfers === 1 ? '' : 's'}` : '', `Source: ${option.source}`].filter(Boolean).join(' · ')}
-                  </div>
-                  <div className="mt-1 font-geist text-[0.5625rem] text-m-faint">{option.fareLabel}</div>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addTransportForAdvice}
-                className="flex w-full items-center justify-center rounded-full bg-m-act px-3 py-[9px] text-[0.6875rem] font-semibold text-m-actfg shadow-[0_8px_20px_rgba(55,124,246,.20)]"
-              >
-                Add transport in TREK
-              </button>
-              <p className="font-geist text-[0.5625rem] leading-relaxed text-m-faint">
-                Timings come from TREK’s configured providers. Fares and seat availability are not claimed live.
-              </p>
-            </div>
-          )}
-        </section>
-      )}
-
       {showTravelerFilter && (
         <TravelerFilterRow
           members={planner.tripMembers}
@@ -183,10 +56,8 @@ export default function MTransportsTab({ planner, shell }: MTabScreenProps) {
         />
       )}
       {sections.length === 0 ? (
-        <div className="flex flex-col items-center justify-center px-8 py-10 text-center">
-          <div aria-hidden className="voya-mobile-orb mb-4 flex h-[68px] w-[68px] items-center justify-center rounded-full">
-            <span className="voya-wordmark text-[28px] text-white">V</span>
-          </div>
+        <div className="flex min-h-full flex-col items-center justify-center px-8 py-10 text-center">
+          <MDancingTrek scene="transport" className="mb-2" />
           <p className="font-geist text-[0.8125rem] font-medium text-m-muted">{t('mobileTrip.transportsEmpty')}</p>
         </div>
       ) : sections.map(section => (

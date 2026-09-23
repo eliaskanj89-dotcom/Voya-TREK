@@ -126,7 +126,7 @@ export default function LoginPage(): React.ReactElement {
         <div className="takeoff-aurora takeoff-aurora-b" />
 
         <div className="takeoff-mark">
-          <div className="voya-wordmark" style={{ color: '#fff', fontSize: 'clamp(54px, 5.2vw, 82px)', textShadow: '0 2px 24px rgba(4,8,20,.4)' }}>Voya</div>
+          <img src="/logo-light.svg" alt="TREK" style={{ height: 'clamp(58px, 5.2vw, 84px)' }} />
           <p
             style={{
               margin: '12px 0 0',
@@ -301,8 +301,8 @@ export default function LoginPage(): React.ReactElement {
                   textAlign: 'left',
                   padding: '9px 16px',
                   border: 'none',
-                  background: value === language ? 'rgba(55,124,246,0.08)' : 'transparent',
-                  color: value === language ? '#377CF6' : '#374151',
+                  background: value === language ? 'rgba(99,102,241,0.08)' : 'transparent',
+                  color: value === language ? '#4f46e5' : '#374151',
                   fontWeight: value === language ? 600 : 400,
                   fontSize: 'calc(14px * var(--fs-scale-body, 1))',
                   cursor: 'pointer',
@@ -380,17 +380,14 @@ export default function LoginPage(): React.ReactElement {
               wide and low-opacity rather than a hard drop shadow, so it reads as the
               map dimming around the mark instead of an outline. */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-            <div
-              className="voya-wordmark"
-              aria-label="Voya"
+            <img
+              src="/logo-light.svg"
+              alt="TREK"
               style={{
-                color: 'white',
-                fontSize: 'clamp(58px, 5.2vw, 84px)',
-                textShadow: '0 2px 10px rgba(4,8,20,0.55), 0 0 34px rgba(4,8,20,0.45)',
+                height: 'clamp(58px, 5.2vw, 84px)',
+                filter: 'drop-shadow(0 2px 10px rgba(4,8,20,0.55)) drop-shadow(0 0 34px rgba(4,8,20,0.45))',
               }}
-            >
-              Voya
-            </div>
+            />
           </div>
 
           <h2
@@ -445,7 +442,7 @@ export default function LoginPage(): React.ReactElement {
             className="mobile-logo"
           >
             <style>{`@media(min-width:1024px){.mobile-logo{display:none!important}}`}</style>
-            <div className="voya-wordmark" style={{ fontSize: 42 }}>Voya</div>
+            <img src="/logo-dark.svg" alt="TREK" style={{ height: 48 }} />
             <p
               style={{
                 margin: 0,

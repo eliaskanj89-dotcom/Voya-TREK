@@ -72,9 +72,9 @@ describe('DemoBanner', () => {
   });
 
   // FE-COMP-DEMOBANNER-009
-  it('shows "What is Voya?" section', () => {
+  it('shows "What is TREK?" section', () => {
     render(<DemoBanner />);
-    expect(screen.getByText('What is Voya?')).toBeInTheDocument();
+    expect(screen.getByText('What is TREK?')).toBeInTheDocument();
   });
 
   // FE-COMP-DEMOBANNER-010

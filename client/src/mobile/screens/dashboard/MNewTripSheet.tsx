@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
 import { Archive, ArchiveRestore, Camera, Search, X } from 'lucide-react'
 import { useTranslation } from '../../../i18n'
 import { tripsApi } from '../../../api/client'
@@ -12,11 +11,10 @@ import { CustomDatePicker } from '../../../components/shared/CustomDateTimePicke
 import CustomSelect from '../../../components/shared/CustomSelect'
 import { currenciesWith, SYMBOLS } from '../../../components/Budget/BudgetPanel.constants'
 import type { DashboardTrip } from '../../../pages/dashboard/dashboardModel'
-import { MAX_TRIP_DAYS, tripSpanDays, type Trip, type TripCreateRequest, type VoyaPlanDraftRequest } from '@trek/shared'
+import { MAX_TRIP_DAYS, tripSpanDays, type Trip, type TripCreateRequest } from '@trek/shared'
 import MSheet from '../../components/MSheet'
 import MIconBtn from '../../components/MIconBtn'
 import MListRow from '../../components/MListRow'
-import MVoyaPlanComposer from './MVoyaPlanComposer'
 
 interface CoverSearchPhoto {
   id: string
@@ -30,13 +28,6 @@ interface MNewTripSheetProps {
   open: boolean
   /** null = create, otherwise edit */
   trip: DashboardTrip | null
-  initialDestination?: string
-  initialDayCount?: number
-  initialVoyaSeed?: {
-    budgetStyle?: VoyaPlanDraftRequest['budgetStyle']
-    interests?: string
-    notes?: string
-  }
   onClose: () => void
   onSave: (data: TripCreateRequest) => Promise<{ trip?: Trip } | void> | void
   onCoverUpdate?: (tripId: number, coverUrl: string | null) => void
@@ -55,9 +46,8 @@ function FieldLabel({ children }: { children: React.ReactNode }): React.ReactEle
  * title, date range and Unsplash cover search (plus device upload). Archiving
  * lives here in edit mode, as decided for the grid cards.
  */
-export default function MNewTripSheet({ open, trip, initialDestination, initialDayCount, initialVoyaSeed, onClose, onSave, onCoverUpdate, onArchive }: MNewTripSheetProps): React.ReactElement {
+export default function MNewTripSheet({ open, trip, onClose, onSave, onCoverUpdate, onArchive }: MNewTripSheetProps): React.ReactElement {
   const isEditing = !!trip
-  const navigate = useNavigate()
   const { t } = useTranslation()
   const toast = useToast()
   const can = useCanDo()
@@ -85,7 +75,7 @@ export default function MNewTripSheet({ open, trip, initialDestination, initialD
 
   useEffect(() => {
     if (!open) return
-    setTitle(trip?.title || initialDestination?.trim() || '')
+    setTitle(trip?.title || '')
     setDescription(trip?.description || '')
     setStartDate(trip?.start_date || '')
     setEndDate(trip?.end_date || '')
@@ -97,7 +87,7 @@ export default function MNewTripSheet({ open, trip, initialDestination, initialD
     setSearchResults([])
     setSearchError('')
     setError('')
-  }, [trip, open, initialDestination, initialDayCount])
+  }, [trip, open])
 
   // The local file preview is a blob url; release it once a new cover replaces it
   // or the sheet goes away. Server and Unsplash urls are left alone.
@@ -119,28 +109,6 @@ export default function MNewTripSheet({ open, trip, initialDestination, initialD
     setStartDate(value)
   }
 
-  const handleVoyaCreated = async (created: Trip) => {
-    if (pendingCoverFile) {
-      try {
-        const fd = new FormData()
-        fd.append('cover', pendingCoverFile)
-        const data = await tripsApi.uploadCover(created.id, fd)
-        onCoverUpdate?.(created.id, data.cover_image)
-      } catch {
-        toast.error(t('dashboard.coverUploadError'))
-      }
-    } else if (pendingUnsplashUrl) {
-      try {
-        await tripsApi.update(created.id, { cover_image: pendingUnsplashUrl })
-        onCoverUpdate?.(created.id, pendingUnsplashUrl)
-      } catch {
-        toast.error(t('dashboard.coverSaveError'))
-      }
-    }
-    onClose()
-    navigate(`/trips/${created.id}`)
-  }
-
   const handleSave = async () => {
     setError('')
     if (!title.trim()) { setError(t('dashboard.titleRequired')); return }
@@ -158,9 +126,7 @@ export default function MNewTripSheet({ open, trip, initialDestination, initialD
         start_date: startDate || null,
         end_date: endDate || null,
         currency,
-        ...(!startDate && !endDate && !isEditing
-          ? { day_count: Number.isInteger(initialDayCount) && (initialDayCount ?? 0) > 0 ? initialDayCount! : 7 }
-          : {}),
+        ...(!startDate && !endDate && !isEditing ? { day_count: 7 } : {}),
       })
       const created = result ? result.trip : undefined
       if (pendingCoverFile && created?.id) {
@@ -287,17 +253,6 @@ export default function MNewTripSheet({ open, trip, initialDestination, initialD
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {!isEditing && (
-          <MVoyaPlanComposer
-            destination={title}
-            startDate={startDate}
-            endDate={endDate}
-            dayCount={Number.isInteger(initialDayCount) && (initialDayCount ?? 0) > 0 ? initialDayCount! : 7}
-            currency={currency}
-            autoExpand={!!initialDestination}
-            onCreated={handleVoyaCreated}
-          />
-        )}
         {error && (
           <div className="mb-3 rounded-[14px] bg-[color:var(--m-ic)] p-[11px_12px] text-[0.75rem] font-semibold text-[color:var(--m-st-danger)]">
             {error}

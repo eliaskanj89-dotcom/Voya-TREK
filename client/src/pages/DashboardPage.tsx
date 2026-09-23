@@ -18,7 +18,7 @@ import {
 import {
   Plus, Edit2, Trash2, Archive, ArchiveRestore, Copy, ArrowRight, MapPin,
   Plane, Hotel, Utensils, Clock, RefreshCw, ArrowRightLeft, Calendar,
-  LayoutGrid, List, Ticket, X, CalendarPlus, ParkingSquare, LogIn, LogOut, Compass,
+  LayoutGrid, List, Ticket, X, CalendarPlus, ParkingSquare, LogIn, LogOut,
 } from 'lucide-react'
 import { IcsSubscribeModal } from '../components/Planner/IcsSubscribeModal'
 import CollectionsWidget from '../components/Dashboard/CollectionsWidget'
@@ -116,7 +116,7 @@ function DashboardPageDesktop(): React.ReactElement {
     spotlight, heroBundle, stats, upcoming, gridTrips, isLoading,
     loadError, retryLoad,
     tripFilter, setTripFilter, viewMode, toggleViewMode,
-    showForm, setShowForm, createSeed, setCreateSeed, editingTrip, setEditingTrip,
+    showForm, setShowForm, editingTrip, setEditingTrip,
     deleteTrip, setDeleteTrip, copyTrip, setCopyTrip, applyCoverUpdate,
     handleCreate, handleUpdate, confirmDelete, handleArchive, handleUnarchive, confirmCopy,
     allSubOpen, setAllSubOpen,
@@ -150,7 +150,7 @@ function DashboardPageDesktop(): React.ReactElement {
           styling instead of inheriting the dashboard scope's font and the
           `.trek-dash button` reset (which shifted the bell icon + menu items). */}
       <Navbar />
-      <div className="trek-dash trek-dash-shell voya-dashboard">
+      <div className="trek-dash trek-dash-shell">
       {demoMode && <DemoBanner />}
       <div className="trek-dash-scroll">
         <MobileTopBar />
@@ -248,7 +248,7 @@ function DashboardPageDesktop(): React.ReactElement {
                   </>
                 )}
                 {tripFilter === 'planned' && !isLoading && (
-                  <button type="button" className="add-trip-card" onClick={() => { setCreateSeed(null); setEditingTrip(null); setShowForm(true) }}>
+                  <button type="button" className="add-trip-card" onClick={() => { setEditingTrip(null); setShowForm(true) }}>
                     <div>
                       <div className="circ"><Plus size={20} /></div>
                       <div className="ttl">{t('dashboard.newTrip')}</div>
@@ -272,17 +272,6 @@ function DashboardPageDesktop(): React.ReactElement {
         </main>
       </div>
 
-      <button
-        type="button"
-        className="fab-discover-trip"
-        onClick={() => navigate('/discover')}
-        aria-label="Help me choose a destination"
-        title="Help me choose"
-      >
-        <Compass size={18} strokeWidth={2.2} />
-        <span>Help me choose</span>
-      </button>
-
       <button type="button"
         className="fab-new-trip"
         onClick={() => { setEditingTrip(null); setShowForm(true) }}
@@ -297,14 +286,7 @@ function DashboardPageDesktop(): React.ReactElement {
         <TripFormModal
           isOpen={showForm}
           trip={editingTrip}
-          initialDestination={!editingTrip ? createSeed?.destination : undefined}
-          initialDayCount={!editingTrip ? createSeed?.days : undefined}
-          initialVoyaSeed={!editingTrip && createSeed ? {
-            budgetStyle: createSeed.budgetStyle,
-            interests: createSeed.interests,
-            notes: createSeed.notes,
-          } : undefined}
-          onClose={() => { setShowForm(false); setEditingTrip(null); setCreateSeed(null) }}
+          onClose={() => { setShowForm(false); setEditingTrip(null) }}
           onSave={editingTrip ? handleUpdate : handleCreate}
           onCoverUpdate={applyCoverUpdate}
         />

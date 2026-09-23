@@ -94,25 +94,9 @@ export default function LlmConnectionSection(): React.ReactElement {
   }
 
   return (
-    <Section title="Voya AI" icon={Sparkles}>
+    <Section title={t('settings.aiParsing.title')} icon={Sparkles}>
       <div className="space-y-3">
-        <div className="rounded-[18px] border border-[#A9C9F5]/25 bg-[linear-gradient(145deg,rgba(242,248,255,.92),rgba(255,255,255,.74))] p-3.5 dark:border-white/8 dark:bg-[linear-gradient(145deg,rgba(19,42,70,.72),rgba(10,25,44,.66))]">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[.12em] text-[#377CF6]">Voya intelligence</div>
-              <p className="mt-1 text-xs leading-relaxed text-content-secondary">
-                This model powers trip generation, Ask Voya edits, Before You Go, and AI document parsing. Your API key is stored encrypted and never shown again.
-              </p>
-            </div>
-            <span className={`flex-none rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-              hasStoredKey && model.trim()
-                ? 'bg-[#198754]/10 text-[#198754]'
-                : 'bg-[#F59E0B]/10 text-[#A16207] dark:text-[#FBBF24]'
-            }`}>
-              {hasStoredKey && model.trim() ? 'Configured' : 'Setup needed'}
-            </span>
-          </div>
-        </div>
+        <p className="text-xs text-content-secondary">{t('settings.aiParsing.hint')}</p>
 
         <div>
           <label className="block text-sm font-medium mb-1.5 text-content-secondary">{t('settings.aiParsing.provider')}</label>
@@ -131,7 +115,7 @@ export default function LlmConnectionSection(): React.ReactElement {
             autoComplete="off"
             value={model}
             onChange={e => setModel(e.target.value)}
-            placeholder={provider === 'anthropic' ? 'claude-3-5-haiku-latest' : 'gpt-4o-mini'}
+            placeholder="qwen3:8b"
             className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 border-edge bg-surface-secondary text-content"
           />
         </div>
@@ -162,7 +146,7 @@ export default function LlmConnectionSection(): React.ReactElement {
         <button type="button"
           onClick={handleSave}
           disabled={saving || !isLoaded}
-          className="flex items-center gap-2 rounded-full bg-[#377CF6] px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(55,124,246,.20)] hover:bg-[#286CE4] disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50"
         >
           <Save className="w-4 h-4" /> {t('common.save')}
         </button>

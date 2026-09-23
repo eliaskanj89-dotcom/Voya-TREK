@@ -18,9 +18,6 @@ import '@fontsource/museomoderno/800.css'
 import '@fontsource/geist-sans/400.css'
 import '@fontsource/geist-sans/500.css'
 import '@fontsource/geist-sans/600.css'
-// Voya editorial display face for premium headings and wordmarks.
-import '@fontsource/playfair-display/500.css'
-import '@fontsource/playfair-display/600.css'
 // Leaflet CSS bundled from node_modules instead of unpkg: the service worker
 // cached the CDN stylesheet as an opaque response, which the browser then
 // rejected, breaking the Atlas/trip maps (#1497). Bundling keeps it same-origin

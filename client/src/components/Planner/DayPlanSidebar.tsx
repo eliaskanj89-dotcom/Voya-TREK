@@ -7,7 +7,7 @@ declare global { interface Window { __dragData: DragDataPayload | null } }
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
 import { avatarSrc } from '../../utils/avatarSrc'
 import { safeHttpUrl } from '../../utils/safeUrl'
-import { ChevronDown, ChevronRight, ChevronUp, Compass, Navigation, RotateCcw, ExternalLink, Clock, Pencil, GripVertical, Ticket, Plus, FileText, Trash2, Car, Lock, Hotel, Footprints, Route as RouteIcon, Bookmark, StickyNote, TramFront, Zap, Sparkles } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronUp, Compass, Navigation, RotateCcw, ExternalLink, Clock, Pencil, GripVertical, Ticket, Plus, FileText, Trash2, Car, Lock, Hotel, Footprints, Route as RouteIcon, Bookmark, StickyNote, TramFront, Zap } from 'lucide-react'
 import { type PickedPlace } from './TransitSearchPanel'
 import { buildTransitLeg, buildTransitNameIndex } from './transitLeg'
 import { assignmentsApi, reservationsApi, daysApi } from '../../api/client'
@@ -51,11 +51,6 @@ import { resolveLegMode } from './legMode'
 import { usePluginDaySchedule, usePluginDayTints, dayTintBackground, dayTinted, PluginDayScheduleRow, formatScheduleMinutes } from '../Plugins/PluginDaySchedule'
 import { MobileAddPlaceButton } from './DayPlanSidebarMobileAddPlaceButton'
 import { DayPlanSidebarToolbar } from './DayPlanSidebarToolbar'
-import VoyaDayEditModal from './VoyaDayEditModal'
-import VoyaTripEditModal from './VoyaTripEditModal'
-import VoyaEditHistoryModal from './VoyaEditHistoryModal'
-import VoyaLiveTripCard from './VoyaLiveTripCard'
-import VoyaJourneyStrip from './VoyaJourneyStrip'
 import { DayPlanSidebarNoteModal } from './DayPlanSidebarNoteModal'
 import { DayPlanSidebarTimeConfirmModal } from './DayPlanSidebarTimeConfirmModal'
 import { DayPlanSidebarTransportDetailModal } from './DayPlanSidebarTransportDetailModal'
@@ -63,7 +58,6 @@ import { TransitTitle, TransitLegChips, TransitItineraryInline } from './transit
 import { DayPlanSidebarFooter } from './DayPlanSidebarFooter'
 import type { Trip, Day, Place, Category, Assignment, Accommodation, Reservation, AssignmentsMap, RouteResult, RouteSegment, DayNote } from '../../types'
 import { getNavigationTargets, openNavigationTarget } from './placeNavigation'
-import { isVoyaSuggestion } from '../../utils/voyaTrust'
 
 interface DayPlanSidebarProps {
   tripId: number
@@ -1091,13 +1085,6 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     return formatMoneySum(entries, costBase, locale, fxRates)
   }, [days, assignments, currency, costBase, locale, fxRates])
 
-  const unpricedVoyaSuggestionCount = useMemo(
-    () => days.reduce((count, d) => count + (assignments[String(d.id)] || []).filter(a =>
-      !!a.place && a.place.price == null && isVoyaSuggestion(a.place)
-    ).length, 0),
-    [days, assignments],
-  )
-
   return {
     tripId,
     trip,
@@ -1237,7 +1224,6 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     handleOptimize,
     handleDropOnDay,
     totalCostLabel,
-    unpricedVoyaSuggestionCount,
     expandedRouteDayIds,
     setExpandedRouteDayIds,
   }
@@ -1263,10 +1249,6 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
   // element exists rather than on a mount that may render nothing yet.
   const [panel, setPanel] = useState<HTMLElement | null>(null)
   const [narrowPanel, setNarrowPanel] = useState(false)
-  const [voyaEditOpen, setVoyaEditOpen] = useState(false)
-  const [voyaEditSeed, setVoyaEditSeed] = useState('')
-  const [voyaTripEditOpen, setVoyaTripEditOpen] = useState(false)
-  const [voyaHistoryOpen, setVoyaHistoryOpen] = useState(false)
   useEffect(() => {
     if (!panel || typeof ResizeObserver === 'undefined') return
     const measure = (): void => setNarrowPanel(panel.clientWidth < NARROW_PLAN_PX)
@@ -1443,34 +1425,9 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
     handleOptimize,
     handleDropOnDay,
     totalCostLabel,
-    unpricedVoyaSuggestionCount,
     expandedRouteDayIds,
     setExpandedRouteDayIds,
   } = S
-
-  useEffect(() => {
-    const onHealthRepair = (event: Event) => {
-      const detail = (event as CustomEvent<{
-        tripId?: number
-        dayId?: number
-        category?: string
-        instruction?: string
-      }>).detail
-      if (detail?.tripId !== tripId || !detail.dayId) return
-      if (detail.category === 'Route') {
-        if (selectedDayId !== detail.dayId) onSelectDay(detail.dayId, false)
-        void handleOptimize(detail.dayId)
-        return
-      }
-      if (detail.category === 'Schedule') {
-        if (selectedDayId !== detail.dayId) onSelectDay(detail.dayId, false)
-        setVoyaEditSeed(detail.instruction || 'Make this day more realistic and fix its timing.')
-        setVoyaEditOpen(true)
-      }
-    }
-    window.addEventListener('voya:trip-health-repair', onHealthRepair)
-    return () => window.removeEventListener('voya:trip-health-repair', onHealthRepair)
-  }, [tripId, selectedDayId, onSelectDay, handleOptimize])
 
   // ── Per-segment / per-day travel mode (#1281) ──────────────────────────────
   // Icon per mode, matching the route picker (driving→Car, walking→Footprints,
@@ -1573,12 +1530,11 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
   }
 
   return (
-    <>
-    {/* Sized as a flex child as well as by height: the desktop panel puts the Days / Road
-        trip switch above this, and at height 100% alone the list ran the switch's height
-        past the panel's clipped edge, so the last day could never be scrolled into view.
-        Where nothing sits above it (the mobile shell), the height still fills the panel. */}
-    <div ref={setPanel} className="voya-day-plan" data-touch-drag={dragDisabled ? undefined : ''} style={{ display: 'flex', flexDirection: 'column', flex: '1 1 0%', minHeight: 0, height: '100%', position: 'relative', fontFamily: "var(--font-system)" }}>
+    // Sized as a flex child as well as by height: the desktop panel puts the Days / Road
+    // trip switch above this, and at height 100% alone the list ran the switch's height
+    // past the panel's clipped edge, so the last day could never be scrolled into view.
+    // Where nothing sits above it (the mobile shell), the height still fills the panel.
+    <div ref={setPanel} data-touch-drag={dragDisabled ? undefined : ''} style={{ display: 'flex', flexDirection: 'column', flex: '1 1 0%', minHeight: 0, height: '100%', position: 'relative', fontFamily: "var(--font-system)" }}>
       {/* Toolbar */}
       <DayPlanSidebarToolbar
         tripId={tripId}
@@ -1606,73 +1562,6 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
         onReorderDays={onReorderDays}
         onAddDay={onAddDay}
       />
-
-      <VoyaJourneyStrip
-        tripId={tripId}
-        days={days}
-        selectedDayId={selectedDayId}
-        onSelectDay={(dayId) => onSelectDay(dayId, false)}
-        onAddTransport={(dayId) => onAddReservation(dayId)}
-      />
-
-      <div className="px-3 pt-2">
-        <VoyaLiveTripCard
-          tripId={tripId}
-          days={days}
-          assignments={assignments}
-          accommodations={accommodations}
-          reservations={reservations}
-          selectedDayId={selectedDayId}
-          onOpenToday={(dayId) => onSelectDay(dayId, false)}
-          onRouteRefresh={onRouteRefresh}
-          onAskVoya={(instruction, dayId) => {
-            if (selectedDayId !== dayId) onSelectDay(dayId, false)
-            setVoyaEditSeed(instruction)
-            setVoyaEditOpen(true)
-          }}
-        />
-      </div>
-
-      {canEditDays && (
-        <div className="flex gap-2 px-3 pt-2">
-          {selectedDayId != null && (
-            <button
-              type="button"
-              onClick={() => { setVoyaEditSeed(''); setVoyaEditOpen(true) }}
-              className="group flex min-w-0 flex-1 items-center justify-between gap-3 rounded-full border border-[#B8D2F5]/35 bg-[linear-gradient(145deg,rgba(241,248,255,.78),rgba(255,255,255,.62))] px-3.5 py-2 text-left transition-all hover:border-[#377CF6]/30 hover:bg-[#377CF6]/5 dark:border-white/7 dark:bg-white/4"
-            >
-              <span className="flex min-w-0 items-center gap-2.5">
-                <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[#377CF6] text-white shadow-[0_6px_16px_rgba(55,124,246,.20)]">
-                  <Sparkles size={12} strokeWidth={2.3} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[11px] font-semibold text-content">Ask Voya · This day</span>
-                  <span className="block truncate text-[10px] text-content-faint">Relax, reorder, swap stops, or shape the evening.</span>
-                </span>
-              </span>
-              <ChevronRight size={13} className="flex-none text-[#377CF6] transition-transform group-hover:translate-x-0.5" />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setVoyaTripEditOpen(true)}
-            className={`group flex items-center justify-center gap-2 rounded-full border border-[#B8D2F5]/35 bg-white/55 px-3 py-2 text-[10px] font-semibold text-content-muted transition-all hover:border-[#377CF6]/30 hover:bg-[#377CF6]/5 hover:text-[#377CF6] dark:border-white/7 dark:bg-white/4 ${selectedDayId == null ? 'flex-1' : 'flex-none'}`}
-            title="Ask Voya about the whole trip"
-          >
-            <Sparkles size={12} strokeWidth={2.2} />
-            <span>{selectedDayId == null ? 'Ask Voya · Whole trip' : 'Whole trip'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setVoyaHistoryOpen(true)}
-            className="group flex flex-none items-center justify-center gap-1.5 rounded-full border border-[#B8D2F5]/35 bg-white/55 px-3 py-2 text-[10px] font-semibold text-content-muted transition-all hover:border-[#377CF6]/30 hover:bg-[#377CF6]/5 hover:text-[#377CF6] dark:border-white/7 dark:bg-white/4"
-            title="Voya AI edit history"
-          >
-            <Clock size={12} strokeWidth={2.2} />
-            <span className={selectedDayId == null ? '' : 'hidden xl:inline'}>History</span>
-          </button>
-        </div>
-      )}
 
       {/* Tagesliste */}
       <div className={`scroll-container${draggingId ? '' : ' trek-stagger'}`} style={{ flex: 1, overflowY: 'auto', minHeight: 0 }} ref={scrollContainerRef} onScroll={(e) => onScrollTopChange?.((e.currentTarget as HTMLElement).scrollTop)}>
@@ -1767,7 +1656,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
             // The card wrapper stays untinted — its three regions (badge, header,
             // activity list) paint themselves, so a plugin controls them separately.
             <div key={day.id} ref={el => { if (el) dayRefs.current.set(day.id, el); else dayRefs.current.delete(day.id) }}
-              className="voya-day-card" title={dayTint?.label || undefined} style={{ borderBottom: '1px solid var(--border-faint)' }}>
+              title={dayTint?.label || undefined} style={{ borderBottom: '1px solid var(--border-faint)' }}>
               {/* Tages-Header — akzeptiert Drops aus der PlacesSidebar */}
               <div
                 className="dp-day-header"
@@ -1965,7 +1854,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                 <div
                   // The activity list — the largest region and the one behind the
                   // densest text, so its tint is the faintest of the three.
-                  className="voya-day-activities" style={{ background: dayTintBackground(dayTint, 'activity', '--day-tint-activity', 'var(--bg-hover)') ?? 'var(--bg-hover)', paddingTop: 6 }}
+                  style={{ background: dayTintBackground(dayTint, 'activity', '--day-tint-activity', 'var(--bg-hover)') ?? 'var(--bg-hover)', paddingTop: 6 }}
                   onDragOver={e => { e.preventDefault(); const cur = dropTargetRef.current; if (draggingId && (!cur || cur.startsWith('end-'))) setDropTargetKey(`end-${day.id}`) }}
                   onDrop={e => {
                     e.preventDefault()
@@ -2302,19 +2191,6 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0, fontSize: 'calc(10px * var(--fs-scale-caption, 1))', color: 'var(--text-faint)', fontWeight: 400, marginLeft: 6 }}>
                                     <Clock size={9} strokeWidth={2} />
                                     {formatTime(place.place_time, locale, timeFormat)}{place.end_time ? ` – ${formatTime(place.end_time, locale, timeFormat)}` : ''}
-                                  </span>
-                                )}
-                                {place.price == null && isVoyaSuggestion(place) && (
-                                  <span
-                                    title="Voya did not verify a current price for this stop."
-                                    style={{
-                                      display: 'inline-flex', alignItems: 'center', flexShrink: 0,
-                                      padding: '2px 6px', borderRadius: 999, marginLeft: 4,
-                                      fontSize: 'calc(8.5px * var(--fs-scale-caption, 1))', fontWeight: 700,
-                                      color: '#A16207', background: 'rgba(245,158,11,.10)',
-                                    }}
-                                  >
-                                    Price unverified
                                   </span>
                                 )}
                               </div>
@@ -3114,62 +2990,9 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
       />
 
       {/* Budget-Fußzeile */}
-      <DayPlanSidebarFooter
-        totalCostLabel={totalCostLabel}
-        unpricedVoyaSuggestionCount={unpricedVoyaSuggestionCount}
-        t={t}
-      />
+      <DayPlanSidebarFooter totalCostLabel={totalCostLabel} t={t} />
       <ContextMenu menu={ctxMenu.menu} onClose={ctxMenu.close} />
     </div>
-      <VoyaTripEditModal
-        isOpen={voyaTripEditOpen}
-        onClose={() => setVoyaTripEditOpen(false)}
-        tripId={tripId}
-        tripTitle={trip.title || 'Trip'}
-        days={days}
-        assignments={assignments}
-        onDayApplied={async () => {
-          await useTripStore.getState().loadTrip(tripId)
-          onRouteRefresh?.()
-        }}
-      />
-      <VoyaEditHistoryModal
-        isOpen={voyaHistoryOpen}
-        onClose={() => setVoyaHistoryOpen(false)}
-        tripId={tripId}
-        days={days}
-        onRestored={async () => {
-          await useTripStore.getState().loadTrip(tripId)
-          onRouteRefresh?.()
-          toast.success('Voya restored that itinerary version.')
-        }}
-      />
-
-      {(() => {
-        if (selectedDayId == null) return null
-        const day = days.find(candidate => candidate.id === selectedDayId)
-        if (!day) return null
-        const dayIndex = days.findIndex(candidate => candidate.id === day.id)
-        const dayLabel = day.title || `Day ${day.day_number ?? dayIndex + 1}`
-        return (
-          <VoyaDayEditModal
-            isOpen={voyaEditOpen}
-            onClose={() => { setVoyaEditOpen(false); setVoyaEditSeed('') }}
-            tripId={tripId}
-            dayId={day.id}
-            dayLabel={dayLabel}
-            assignments={assignments[String(day.id)] || []}
-            initialInstruction={voyaEditSeed}
-            autoPreview={!!voyaEditSeed}
-            onApplied={async () => {
-              await useTripStore.getState().loadTrip(tripId)
-              onRouteRefresh?.()
-              toast.success('Voya updated this day.')
-            }}
-          />
-        )
-      })()}
-    </>
   )
 })
 

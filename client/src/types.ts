@@ -29,7 +29,6 @@ import type {
   Tag,
   Category,
   AppearanceConfig,
-  VoyaTravelerDna,
 } from '@trek/shared'
 
 export type {
@@ -54,7 +53,6 @@ export type {
   Tag,
   Category,
   AppearanceConfig,
-  VoyaTravelerDna,
 }
 
 export interface User {
@@ -231,8 +229,6 @@ export interface Settings {
   llm_base_url?: string
   llm_multimodal?: boolean
   llm_api_key?: string
-  /** Saved Voya planning preferences used as background context for AI trips/edits. */
-  voya_traveler_dna?: VoyaTravelerDna
   /** Per-user appearance/customization config (theming, transparency, typography, dashboard widgets). */
   appearance?: AppearanceConfig
 }
