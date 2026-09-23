@@ -38,3 +38,6 @@ jobs:
 
       - name: Voya itinerary invariants
         run: npm run test --workspace=server -- tests/unit/nest/voya-ai-multicity.test.ts tests/unit/nest/voya-ai-trip-edit.test.ts tests/unit/nest/voya-ai-history.test.ts tests/unit/nest/voya-ai-readiness-todo.test.ts
+
+      - name: Voya client trust invariants
+        run: npm run test --workspace=client -- tests/unit/utils/voyaTrust.test.ts tests/unit/services/voyaEnrichment.test.ts tests/unit/planner/DayPlanSidebarFooter.voya.test.tsx
