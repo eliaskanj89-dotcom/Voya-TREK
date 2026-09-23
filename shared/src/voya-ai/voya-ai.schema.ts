@@ -102,3 +102,47 @@ export const voyaVerifyTripResultSchema = z.object({
   })),
 });
 export type VoyaVerifyTripResult = z.infer<typeof voyaVerifyTripResultSchema>;
+
+
+export const voyaDayEditRequestSchema = z.object({
+  tripId: z.number().int().positive(),
+  dayId: z.number().int().positive(),
+  instruction: z.string().trim().min(3).max(1200),
+});
+export type VoyaDayEditRequest = z.infer<typeof voyaDayEditRequestSchema>;
+
+export const voyaDayEditExistingItemSchema = z.object({
+  kind: z.literal('existing'),
+  assignmentId: z.number().int().positive(),
+  startTime: z.string().regex(time24).nullable().optional(),
+  endTime: z.string().regex(time24).nullable().optional(),
+  notes: z.string().trim().max(400).nullable().optional(),
+});
+
+export const voyaDayEditNewItemSchema = z.object({
+  kind: z.literal('new'),
+  activity: voyaSuggestedActivitySchema,
+});
+
+export const voyaDayEditDraftSchema = z.object({
+  tripId: z.number().int().positive(),
+  dayId: z.number().int().positive(),
+  summary: z.string().trim().min(1).max(700),
+  title: z.string().trim().min(1).max(140).optional(),
+  objective: z.string().trim().max(500).optional(),
+  sequence: z.array(z.discriminatedUnion('kind', [
+    voyaDayEditExistingItemSchema,
+    voyaDayEditNewItemSchema,
+  ])).min(1).max(16),
+  removedAssignmentIds: z.array(z.number().int().positive()).max(16).default([]),
+  generatedBy: z.object({
+    provider: z.enum(['local', 'openai', 'anthropic']),
+    model: z.string().min(1),
+  }),
+});
+export type VoyaDayEditDraft = z.infer<typeof voyaDayEditDraftSchema>;
+
+export const voyaApplyDayEditRequestSchema = z.object({
+  draft: voyaDayEditDraftSchema,
+});
+export type VoyaApplyDayEditRequest = z.infer<typeof voyaApplyDayEditRequestSchema>;
