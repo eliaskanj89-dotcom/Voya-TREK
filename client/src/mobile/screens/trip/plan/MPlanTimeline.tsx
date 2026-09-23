@@ -26,6 +26,7 @@ import type { Assignment } from '../../../../types'
 import type { ComponentType, ReactNode } from 'react'
 import GoogleMapsIcon from '../../../../components/shared/GoogleMapsIcon'
 import VoyaDayEditModal from '../../../../components/Planner/VoyaDayEditModal'
+import VoyaTripEditModal from '../../../../components/Planner/VoyaTripEditModal'
 import { useTripStore } from '../../../../store/tripStore'
 import { isRtlLanguage } from '../../../../i18n'
 import { useMPlanDaySwipe } from './useMPlanDaySwipe'
@@ -43,6 +44,7 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
   const tl = useMPlanTimeline(planner)
   const { t, trip, can } = planner
   const [voyaEditOpen, setVoyaEditOpen] = useState(false)
+  const [voyaTripEditOpen, setVoyaTripEditOpen] = useState(false)
   const canEdit = can('day_edit', trip)
   const editing = shell.mode === 'edit' && canEdit
   const canEditPlaces = can('place_edit', trip)
@@ -288,10 +290,24 @@ export default function MPlanTimeline({ planner, shell }: MPlanTimelineProps) {
             <PlanAction icon={Route} label={t('dayplan.optimize')} onClick={() => void tl.optimize()} />
             <PlanAction icon={GoogleMapsIcon} label={t('mobileTrip.googleMaps')} onClick={tl.exportGoogleMaps} />
             <PlanAction icon={Compass} label={t('mobileTrip.coMaps')} onClick={tl.exportCoMaps} />
-            <PlanAction icon={Sparkles} label="Ask Voya" onClick={() => setVoyaEditOpen(true)} />
+            <PlanAction icon={Sparkles} label="Ask Voya · Day" onClick={() => setVoyaEditOpen(true)} />
+            <PlanAction icon={Sparkles} label="Ask Voya · Trip" onClick={() => setVoyaTripEditOpen(true)} />
           </div>
         )}
       </div>
+
+      <VoyaTripEditModal
+        isOpen={voyaTripEditOpen}
+        onClose={() => setVoyaTripEditOpen(false)}
+        tripId={planner.tripId}
+        tripTitle={trip?.title || 'Trip'}
+        days={planner.days}
+        assignments={planner.assignments}
+        onDayApplied={async () => {
+          await useTripStore.getState().loadTrip(planner.tripId)
+          planner.autoShowRoute()
+        }}
+      />
 
       {day && (
         <VoyaDayEditModal
