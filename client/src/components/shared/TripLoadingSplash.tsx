@@ -203,6 +203,7 @@ export default function TripLoadingSplash({ title }: { title?: string }) {
             <div
               key={step.phase}
               className="voya-splash-mark"
+              data-phase={step.phase}
               style={reduceMotion ? undefined : { animation: 'voya-splash-beat 520ms cubic-bezier(.16,1,.3,1) both' }}
             >
               <span className="voya-wordmark relative z-10 text-[44px] text-white">V</span>
