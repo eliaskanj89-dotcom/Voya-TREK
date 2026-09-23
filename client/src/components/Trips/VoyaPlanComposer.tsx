@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Check, MapPin, Sparkles } from 'lucide-react'
-import type { Trip, VoyaPlanDraftRequest, VoyaPlanDraftResponse } from '@trek/shared'
+import { ArrowDown, ArrowRight, ArrowUp, Check, MapPin, Plus, Sparkles, Trash2 } from 'lucide-react'
+import type { Trip, VoyaMultiCityPlanDraft, VoyaMultiCityPlanRequest, VoyaPlanDraftRequest, VoyaPlanDraftResponse } from '@trek/shared'
 import { tripSpanDays } from '@trek/shared'
 import { voyaAiApi } from '../../api/client'
 import { getApiErrorMessage } from '../../types'
@@ -31,29 +31,34 @@ export default function VoyaPlanComposer({
 }: VoyaPlanComposerProps) {
   const travelerDna = useSettingsStore(state => state.settings.voya_traveler_dna)
   const [expanded, setExpanded] = useState(autoExpand)
+  const [tripMode, setTripMode] = useState<'single' | 'multi'>('single')
   const [destination, setDestination] = useState(initialDestination)
+  const [multiDestinations, setMultiDestinations] = useState<string[]>([initialDestination, ''])
   const [pace, setPace] = useState<VoyaPlanDraftRequest['pace']>(travelerDna?.pace ?? 'balanced')
   const [budgetStyle, setBudgetStyle] = useState<VoyaPlanDraftRequest['budgetStyle']>(travelerDna?.budgetStyle ?? 'moderate')
   const [interests, setInterests] = useState('')
   const [notes, setNotes] = useState('')
   const [draft, setDraft] = useState<VoyaPlanDraftResponse | null>(null)
+  const [multiDraft, setMultiDraft] = useState<VoyaMultiCityPlanDraft | null>(null)
   const [request, setRequest] = useState<VoyaPlanDraftRequest | null>(null)
+  const [multiRequest, setMultiRequest] = useState<VoyaMultiCityPlanRequest | null>(null)
   const [generating, setGenerating] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (autoExpand && initialDestination.trim()) {
+    if (initialDestination.trim()) {
       setDestination(initialDestination)
-      setExpanded(true)
+      setMultiDestinations(current => [initialDestination, ...current.slice(1)])
     }
+    if (autoExpand && initialDestination.trim()) setExpanded(true)
   }, [autoExpand, initialDestination])
 
   useEffect(() => {
-    if (expanded || draft) return
+    if (expanded || draft || multiDraft) return
     setPace(travelerDna?.pace ?? 'balanced')
     setBudgetStyle(travelerDna?.budgetStyle ?? 'moderate')
-  }, [travelerDna?.pace, travelerDna?.budgetStyle, expanded, draft])
+  }, [travelerDna?.pace, travelerDna?.budgetStyle, expanded, draft, multiDraft])
 
   const days = useMemo(() => {
     if (startDate && endDate) return tripSpanDays(startDate, endDate)
@@ -86,33 +91,101 @@ export default function VoyaPlanComposer({
     }
   }
 
+
+  const buildMultiRequest = (): VoyaMultiCityPlanRequest | null => {
+    const cleaned = multiDestinations.map(value => value.trim()).filter(Boolean)
+    const unique = cleaned.filter((value, index) =>
+      cleaned.findIndex(other => other.toLowerCase() === value.toLowerCase()) === index
+    )
+    if (unique.length < 2) {
+      setError('Add at least two destinations for a multi-city journey.')
+      return null
+    }
+    if (unique.length > 6) {
+      setError('Voya supports up to six destinations in one journey.')
+      return null
+    }
+    if (days < unique.length) {
+      setError('The trip needs at least one day per destination.')
+      return null
+    }
+    return {
+      destinations: unique.map(name => ({ name })),
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      days,
+      travelers: Math.max(1, travelers),
+      currency: currency || 'USD',
+      pace,
+      budgetStyle,
+      interests: interests.split(',').map(value => value.trim()).filter(Boolean).slice(0, 12),
+      notes: notes.trim() || undefined,
+      allowReorder: true,
+    }
+  }
+
+  const updateMultiDestination = (index: number, value: string) => {
+    setMultiDestinations(current => current.map((item, i) => i === index ? value : item))
+  }
+  const addMultiDestination = () => {
+    setMultiDestinations(current => current.length >= 6 ? current : [...current, ''])
+  }
+  const removeMultiDestination = (index: number) => {
+    setMultiDestinations(current => current.length <= 2 ? current : current.filter((_, i) => i !== index))
+  }
+  const moveMultiDestination = (index: number, direction: -1 | 1) => {
+    setMultiDestinations(current => {
+      const target = index + direction
+      if (target < 0 || target >= current.length) return current
+      const next = [...current]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+  }
+
   const generate = async () => {
-    const payload = buildRequest()
-    if (!payload) return
     setGenerating(true)
     setError('')
     setDraft(null)
+    setMultiDraft(null)
     try {
-      const result = await voyaAiApi.planDraft(payload)
-      setRequest(payload)
-      setDraft(result.draft)
+      if (tripMode === 'multi') {
+        const payload = buildMultiRequest()
+        if (!payload) return
+        const result = await voyaAiApi.planMultiCityDraft(payload)
+        setMultiRequest(payload)
+        setMultiDraft(result.draft)
+      } else {
+        const payload = buildRequest()
+        if (!payload) return
+        const result = await voyaAiApi.planDraft(payload)
+        setRequest(payload)
+        setDraft(result.draft)
+      }
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Voya could not generate this trip right now.'))
+      setError(getApiErrorMessage(err, tripMode === 'multi'
+        ? 'Voya could not generate this multi-city journey right now.'
+        : 'Voya could not generate this trip right now.'))
     } finally {
       setGenerating(false)
     }
   }
 
   const createTrip = async () => {
-    if (!draft || !request) return
     setCreating(true)
     setError('')
     try {
-      const result = await voyaAiApi.materializeDraft({
-        request,
-        draft,
-        reminderDays,
-      })
+      if (multiDraft && multiRequest) {
+        const result = await voyaAiApi.materializeMultiCityDraft({
+          request: multiRequest,
+          draft: multiDraft,
+          reminderDays,
+        })
+        await onCreated(result.trip)
+        return
+      }
+      if (!draft || !request) return
+      const result = await voyaAiApi.materializeDraft({ request, draft, reminderDays })
       await onCreated(result.trip)
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Voya could not create this trip.'))
@@ -120,6 +193,8 @@ export default function VoyaPlanComposer({
       setCreating(false)
     }
   }
+
+  const previewDraft = multiDraft ?? draft
 
   if (!expanded) {
     return (
@@ -161,27 +236,83 @@ export default function VoyaPlanComposer({
         </div>
         <button
           type="button"
-          onClick={() => { setExpanded(false); setDraft(null); setError('') }}
+          onClick={() => { setExpanded(false); setDraft(null); setMultiDraft(null); setError('') }}
           className="rounded-full px-3 py-1.5 text-caption font-medium text-content-muted hover:bg-surface-hover"
         >
           Manual
         </button>
       </div>
 
-      {!draft ? (
+      {!previewDraft ? (
         <div className="space-y-4 p-5">
-          <div>
-            <label className="mb-2 block text-caption font-semibold uppercase tracking-[.14em] text-content-faint">Destination</label>
-            <div className="relative">
-              <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#377CF6]" />
-              <input
-                value={destination}
-                onChange={event => setDestination(event.target.value)}
-                placeholder="Tokyo, Japan"
-                className="w-full rounded-2xl border border-edge bg-white/75 py-3 pl-10 pr-4 text-body text-content outline-none placeholder:text-content-faint focus:border-[#377CF6] focus:ring-4 focus:ring-[#377CF6]/10 dark:bg-white/5"
-              />
-            </div>
+          <div className="inline-flex rounded-full bg-[#EAF2FF]/85 p-1 dark:bg-white/5">
+            <button
+              type="button"
+              onClick={() => { setTripMode('single'); setError('') }}
+              className={`rounded-full px-4 py-2 text-caption font-semibold transition-all ${tripMode === 'single' ? 'bg-white text-[#377CF6] shadow-[0_5px_14px_rgba(31,67,112,.10)] dark:bg-white/10 dark:text-[#79AEFF]' : 'text-content-muted'}`}
+            >
+              Single city
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTripMode('multi')
+                setMultiDestinations(current => {
+                  const next = [...current]
+                  if (!next[0] && destination.trim()) next[0] = destination.trim()
+                  return next.length >= 2 ? next : [...next, '']
+                })
+                setError('')
+              }}
+              className={`rounded-full px-4 py-2 text-caption font-semibold transition-all ${tripMode === 'multi' ? 'bg-white text-[#377CF6] shadow-[0_5px_14px_rgba(31,67,112,.10)] dark:bg-white/10 dark:text-[#79AEFF]' : 'text-content-muted'}`}
+            >
+              Multi-city
+            </button>
           </div>
+
+          {tripMode === 'single' ? (
+            <div>
+              <label className="mb-2 block text-caption font-semibold uppercase tracking-[.14em] text-content-faint">Destination</label>
+              <div className="relative">
+                <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#377CF6]" />
+                <input
+                  value={destination}
+                  onChange={event => setDestination(event.target.value)}
+                  placeholder="Tokyo, Japan"
+                  className="w-full rounded-2xl border border-edge bg-white/75 py-3 pl-10 pr-4 text-body text-content outline-none placeholder:text-content-faint focus:border-[#377CF6] focus:ring-4 focus:ring-[#377CF6]/10 dark:bg-white/5"
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <label className="text-caption font-semibold uppercase tracking-[.14em] text-content-faint">Journey order</label>
+                <span className="text-caption text-content-faint">{multiDestinations.length}/6 destinations</span>
+              </div>
+              <div className="space-y-2">
+                {multiDestinations.map((value, index) => (
+                  <div key={index} className="flex items-center gap-2 rounded-[16px] border border-edge-faint bg-white/60 p-2 dark:bg-white/4">
+                    <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[#377CF6] text-[11px] font-bold text-white">{index + 1}</span>
+                    <input
+                      value={value}
+                      onChange={event => updateMultiDestination(index, event.target.value)}
+                      placeholder={index === 0 ? 'Rome, Italy' : index === 1 ? 'Florence, Italy' : 'Another destination'}
+                      className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-body text-content outline-none placeholder:text-content-faint"
+                    />
+                    <button type="button" onClick={() => moveMultiDestination(index, -1)} disabled={index === 0} className="rounded-full p-1.5 text-content-faint hover:bg-surface-hover disabled:opacity-25"><ArrowUp size={13}/></button>
+                    <button type="button" onClick={() => moveMultiDestination(index, 1)} disabled={index === multiDestinations.length - 1} className="rounded-full p-1.5 text-content-faint hover:bg-surface-hover disabled:opacity-25"><ArrowDown size={13}/></button>
+                    <button type="button" onClick={() => removeMultiDestination(index)} disabled={multiDestinations.length <= 2} className="rounded-full p-1.5 text-content-faint hover:bg-danger-soft hover:text-danger disabled:opacity-25"><Trash2 size={13}/></button>
+                  </div>
+                ))}
+              </div>
+              {multiDestinations.length < 6 && (
+                <button type="button" onClick={addMultiDestination} className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#377CF6]/20 px-3 py-1.5 text-caption font-semibold text-[#377CF6] hover:bg-[#377CF6]/5">
+                  <Plus size={12}/> Add destination
+                </button>
+              )}
+              <p className="mt-2 text-caption text-content-faint">Voya may reorder stops when it materially improves the route, and will explain why.</p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Choice
@@ -264,20 +395,43 @@ export default function VoyaPlanComposer({
               <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[#377CF6]/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.12em] text-[#377CF6]">
                 <Check size={12} /> Draft ready
               </div>
-              <h3 className="voya-editorial text-[31px] font-medium leading-[1.02] tracking-[-.045em] text-content">{draft.title}</h3>
-              <p className="mt-2 text-body leading-relaxed text-content-muted">{draft.summary}</p>
+              <h3 className="voya-editorial text-[31px] font-medium leading-[1.02] tracking-[-.045em] text-content">{previewDraft!.title}</h3>
+              <p className="mt-2 text-body leading-relaxed text-content-muted">{previewDraft!.summary}</p>
             </div>
-            <button type="button" onClick={() => setDraft(null)} className="rounded-full border border-edge px-3.5 py-2 text-caption font-medium text-content-secondary hover:bg-surface-hover">
+            <button type="button" onClick={() => { setDraft(null); setMultiDraft(null) }} className="rounded-full border border-edge px-3.5 py-2 text-caption font-medium text-content-secondary hover:bg-surface-hover">
               Adjust
             </button>
           </div>
 
+          {multiDraft && (
+            <div className="mb-4 rounded-[20px] border border-[#A9C9F5]/25 bg-[#F5F9FF]/75 p-3.5 dark:bg-white/4">
+              <div className="text-[10px] font-semibold uppercase tracking-[.13em] text-[#377CF6]">Journey plan</div>
+              <div className="mt-2 flex items-center gap-2 overflow-x-auto pb-1">
+                {multiDraft.legs.map((leg, index) => (
+                  <div key={`${leg.order}-${leg.destination}`} className="flex flex-none items-center gap-2">
+                    {index > 0 && (
+                      <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-medium text-content-muted shadow-sm dark:bg-white/6">
+                        {leg.transportFromPrevious || 'Transfer'}{leg.transferDurationLabel ? ` · ${leg.transferDurationLabel}` : ''}
+                      </span>
+                    )}
+                    <div className="rounded-[14px] bg-white px-3 py-2 shadow-[0_6px_16px_rgba(31,67,112,.07)] dark:bg-white/6">
+                      <div className="text-[10px] uppercase tracking-[.1em] text-content-faint">Stop {leg.order}</div>
+                      <div className="text-caption font-semibold text-content">{leg.destination}</div>
+                      <div className="text-[10px] text-content-faint">{leg.allocatedDays} day{leg.allocatedDays === 1 ? '' : 's'}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-caption leading-relaxed text-content-muted">{multiDraft.journeySummary}</p>
+            </div>
+          )}
+
           <div className="max-h-[390px] space-y-2.5 overflow-y-auto pr-1">
-            {draft.days.map(day => (
+            {previewDraft!.days.map(day => (
               <details key={day.dayNumber} className="group overflow-hidden rounded-[18px] border border-[#9CBDE6]/15 bg-white/62 open:bg-white/88 dark:bg-white/4 dark:open:bg-white/6">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5">
                   <div className="min-w-0">
-                    <div className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#377CF6]">Day {day.dayNumber}{day.date ? ` · ${day.date}` : ''}</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#377CF6]">Day {day.dayNumber}{day.destination ? ` · ${day.destination}` : ''}{day.date ? ` · ${day.date}` : ''}</div>
                     <div className="voya-editorial mt-0.5 truncate text-[19px] font-medium tracking-[-.03em] text-content">{day.title}</div>
                   </div>
                   <span className="flex-none rounded-full bg-[#377CF6]/8 px-2.5 py-1 text-[11px] font-medium text-content-muted">{day.activities.length} stops</span>
