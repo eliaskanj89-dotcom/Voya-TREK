@@ -26,7 +26,8 @@ import {
   type TripCreateGuestRequest, type TripRenameGuestRequest, type AssignmentReorderRequest,
   type PackingReorderRequest, type PackingCreateBagRequest, type TodoReorderRequest,
   type TripCreateRequest, type TripUpdateRequest, type TripCopyRequest, type ActiveTripResponse,
-  type VoyaPlanDraftRequest, type VoyaPlanDraftResponse,
+  type VoyaPlanDraftRequest, type VoyaPlanDraftResponse, type VoyaMaterializeDraftRequest,
+  type Trip, type Day,
   type DayCreateRequest, type DayUpdateRequest, type DayReorderRequest,
   type PlaceCreateRequest, type PlaceUpdateRequest,
   type ReservationCreateRequest, type ReservationUpdateRequest,
@@ -412,6 +413,8 @@ export const oauthApi = {
 export const voyaAiApi = {
   planDraft: (data: VoyaPlanDraftRequest): Promise<{ draft: VoyaPlanDraftResponse }> =>
     apiClient.post('/voya-ai/plan-draft', data, { timeout: 120000 }).then(r => r.data),
+  materializeDraft: (data: VoyaMaterializeDraftRequest): Promise<{ trip: Trip; days: Day[]; draft: VoyaPlanDraftResponse }> =>
+    apiClient.post('/voya-ai/materialize-draft', data, { timeout: 120000 }).then(r => r.data),
 }
 
 export const tripsApi = {
