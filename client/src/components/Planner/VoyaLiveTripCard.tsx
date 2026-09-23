@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Clock, Hotel, MapPin, Navigation, TimerReset } from 'lucide-react'
+import { CloudRain, Clock, Coffee, Hotel, MapPin, Navigation, SkipForward, Sparkles, TimerReset } from 'lucide-react'
 import type { Accommodation, Assignment, AssignmentsMap, Day, Reservation } from '../../types'
 import { assignmentsApi } from '../../api/client'
 import { useToast } from '../shared/Toast'
@@ -17,6 +17,7 @@ interface VoyaLiveTripCardProps {
   selectedDayId: number | null
   onOpenToday?: (dayId: number) => void
   onRouteRefresh?: () => void
+  onAskVoya?: (instruction: string, dayId: number) => void
   compact?: boolean
 }
 
@@ -50,6 +51,7 @@ export default function VoyaLiveTripCard({
   selectedDayId,
   onOpenToday,
   onRouteRefresh,
+  onAskVoya,
   compact = false,
 }: VoyaLiveTripCardProps) {
   const toast = useToast()
@@ -133,6 +135,42 @@ export default function VoyaLiveTripCard({
       setShifting(false)
     }
   }
+
+  const quickVoya = (instruction: string) => {
+    if (todayDayId == null || !onAskVoya) return
+    if (selectedDayId !== todayDayId) onOpenToday?.(todayDayId)
+    onAskVoya(instruction, todayDayId)
+  }
+
+  const nextName = next?.assignment.place?.name || 'the next stop'
+  const quickActions = onAskVoya ? [
+    {
+      key: 'tired',
+      label: "I'm tired",
+      Icon: Coffee,
+      instruction: `Make the remaining part of today lighter. Keep protected hotel-linked items and booked transport. Prioritize the highest-value remaining stops, reduce unnecessary walking/backtracking, add breathing room, and finish earlier. Do not change anything that already happened earlier today.`,
+    },
+    {
+      key: 'skip',
+      label: 'Skip next',
+      Icon: SkipForward,
+      disabled: !next,
+      instruction: `Remove "${nextName}" from the rest of today and rebalance only the remaining schedule. Keep protected hotel-linked items and booked transport. Preserve already-completed stops and avoid adding a replacement unless it clearly improves the day.`,
+    },
+    {
+      key: 'nearby',
+      label: 'Nearby swap',
+      Icon: MapPin,
+      disabled: !next,
+      instruction: `Replace "${nextName}" with one nearby alternative that fits the same general intent but reduces travel from the surrounding stops. Keep the rest of today coherent, preserve protected hotel-linked items and booked transport, and do not change earlier completed stops.`,
+    },
+    {
+      key: 'rain',
+      label: 'Rain plan',
+      Icon: CloudRain,
+      instruction: `Assume rain is affecting the remaining part of today. Rework only the remaining schedule toward indoor or weather-resilient options while preserving the day's core intent, protected hotel-linked items, booked transport, and anything already completed. Minimize unnecessary outdoor walking.`,
+    },
+  ] : []
 
   const dayLabel = todayDay.title || `Day ${todayDay.day_number ?? days.indexOf(todayDay) + 1}`
   const stayLabel = stayChanged
@@ -244,6 +282,32 @@ export default function VoyaLiveTripCard({
           </span>
         )}
       </div>
+
+      {quickActions.length > 0 && (
+        <div className="mt-3 border-t border-white/8 pt-3">
+          <div className="mb-2 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[.12em] text-white/38">
+            <Sparkles size={10} />
+            Replan the rest of today
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {quickActions.map(({ key, label, Icon, instruction, disabled }) => (
+              <button
+                key={key}
+                type="button"
+                disabled={disabled}
+                onClick={() => quickVoya(instruction)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-[10px] font-semibold text-white/78 transition-all hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <Icon size={11} />
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[9px] leading-relaxed text-white/35">
+            Voya generates a reviewable proposal first. Nothing changes until you approve it.
+          </p>
+        </div>
+      )}
     </section>
   )
 }
