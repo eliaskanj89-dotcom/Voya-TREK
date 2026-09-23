@@ -35,6 +35,19 @@ export class VoyaAiController {
     }
   }
 
+  @Post('trip-health')
+  tripHealth(@CurrentUser() user: User, @Body() body: VoyaTripHealthDto) {
+    try {
+      return this.voya.getTripHealth(user, body);
+    } catch (error) {
+      if (error instanceof VoyaAiPermissionError) {
+        throw new HttpException({ error: error.message, code: 'VOYA_AI_FORBIDDEN' }, 403);
+      }
+      console.error('Voya Trip Health failed:', error instanceof Error ? error.message : 'unknown error');
+      throw new HttpException({ error: 'Voya could not audit this trip', code: 'VOYA_TRIP_HEALTH_ERROR' }, 500);
+    }
+  }
+
   @Post('readiness')
   readiness(@CurrentUser() user: User, @Body() body: VoyaReadinessBuildDto) {
     try {
