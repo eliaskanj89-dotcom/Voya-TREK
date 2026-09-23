@@ -26,7 +26,7 @@ import {
   type TripCreateGuestRequest, type TripRenameGuestRequest, type AssignmentReorderRequest,
   type PackingReorderRequest, type PackingCreateBagRequest, type TodoReorderRequest,
   type TripCreateRequest, type TripUpdateRequest, type TripCopyRequest, type ActiveTripResponse,
-  type VoyaPlanDraftRequest, type VoyaPlanDraftResponse, type VoyaApplyDayEditRequest, type VoyaDayEditDraft, type VoyaDayEditRequest,
+  type VoyaPlanDraftRequest, type VoyaPlanDraftResponse, type VoyaApplyDayEditRequest, type VoyaApplyTripEditRequest, type VoyaDayEditDraft, type VoyaDayEditRequest,
   type VoyaMaterializeDraftRequest, type VoyaMaterializeMultiCityDraftRequest, type VoyaMultiCityPlanDraft, type VoyaMultiCityPlanRequest, type VoyaTripEditPlan, type VoyaTripEditRequest, type VoyaVerifyTripRequest, type VoyaVerifyTripResult,
   type VoyaReadinessBuildRequest, type VoyaReadinessResult, type VoyaReadinessStatusRequest,
   type VoyaDestinationDiscoveryRequest, type VoyaDestinationDiscoveryResult,
@@ -438,6 +438,8 @@ export const voyaAiApi = {
     apiClient.post('/voya-ai/day-edit-draft', data, { timeout: 120000 }).then(r => r.data),
   applyDayEdit: (data: VoyaApplyDayEditRequest) =>
     apiClient.post('/voya-ai/apply-day-edit', data, { timeout: 120000 }).then(r => r.data),
+  applyTripEdit: (data: VoyaApplyTripEditRequest): Promise<{ tripId: number; affectedDays: number[]; appliedDays: number }> =>
+    apiClient.post('/voya-ai/apply-trip-edit', data, { timeout: 120000 }).then(r => r.data),
 }
 
 export const tripsApi = {
