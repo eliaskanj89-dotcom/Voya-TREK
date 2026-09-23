@@ -2,15 +2,15 @@ name: Import TREK baseline
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  import:
-    if: github.event.head_commit.message != 'chore: import TREK v4.3.1 upstream baseline'
+  import_trek:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Voya-TREK
@@ -18,49 +18,29 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Clone TREK v4.3.1 baseline
+      - name: Clone pinned TREK baseline
         run: |
           rm -rf /tmp/trek
-          git clone --depth 1 https://github.com/liketrek/TREK.git /tmp/trek
+          git clone https://github.com/liketrek/TREK.git /tmp/trek
           cd /tmp/trek
           git checkout ed8acf4c4b642bcf4975f8d1ee43801fb3b65941
 
-      - name: Replace repository tree with TREK baseline
+      - name: Copy TREK source tree
         run: |
-          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          rsync -a --exclude='.git' /tmp/trek/ ./
-          mkdir -p .github/workflows
-          cat > .github/workflows/import-trek.yml <<'KEEP'
-          name: Import TREK baseline
-          on:
-            workflow_dispatch:
-          permissions:
-            contents: write
-          jobs:
-            noop:
-              runs-on: ubuntu-latest
-              steps:
-                - run: echo "TREK baseline already imported."
-          KEEP
+          rsync -a --delete             --exclude='.git'             --exclude='.github/workflows'             /tmp/trek/ ./
 
-      - name: Preserve migration provenance
+      - name: Add Voya migration provenance
         run: |
-          cat > VOYA_MIGRATION.md <<'EOF'
-          # Voya migration baseline
+          printf '%s\n'             '# Voya migration baseline'             ''             'This repository started from TREK v4.3.1 at upstream commit:'             '`ed8acf4c4b642bcf4975f8d1ee43801fb3b65941`.'             ''             'Upstream: https://github.com/liketrek/TREK'             ''             'TREK AGPL-3.0 licensing, copyright notices, NOTICE.md, and trademark terms are preserved.'             'Voya-specific changes are layered on top in later commits.'             > VOYA_MIGRATION.md
 
-          This repository started from TREK v4.3.1 at upstream commit:
-          `ed8acf4c4b642bcf4975f8d1ee43801fb3b65941`.
-
-          Upstream: https://github.com/liketrek/TREK
-
-          TREK's AGPL-3.0 license, copyright notices, NOTICE.md, and trademark terms are preserved.
-          Voya-specific changes are layered on top in subsequent commits.
-          EOF
-
-      - name: Commit imported baseline
+      - name: Commit baseline
         run: |
           git config user.name "Voya Migration Bot"
           git config user.email "actions@users.noreply.github.com"
           git add -A
-          git commit -m "chore: import TREK v4.3.1 upstream baseline"
-          git push origin HEAD:main
+          if git diff --cached --quiet; then
+            echo "No import changes to commit."
+          else
+            git commit -m "chore: import TREK v4.3.1 upstream baseline"
+            git push origin HEAD:main
+          fi
