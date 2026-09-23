@@ -7,7 +7,7 @@ declare global { interface Window { __dragData: DragDataPayload | null } }
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
 import { avatarSrc } from '../../utils/avatarSrc'
 import { safeHttpUrl } from '../../utils/safeUrl'
-import { ChevronDown, ChevronRight, ChevronUp, Compass, Navigation, RotateCcw, ExternalLink, Clock, Pencil, GripVertical, Ticket, Plus, FileText, Trash2, Car, Lock, Hotel, Footprints, Route as RouteIcon, Bookmark, StickyNote, TramFront, Zap } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronUp, Compass, Navigation, RotateCcw, ExternalLink, Clock, Pencil, GripVertical, Ticket, Plus, FileText, Trash2, Car, Lock, Hotel, Footprints, Route as RouteIcon, Bookmark, StickyNote, TramFront, Zap, Sparkles } from 'lucide-react'
 import { type PickedPlace } from './TransitSearchPanel'
 import { buildTransitLeg, buildTransitNameIndex } from './transitLeg'
 import { assignmentsApi, reservationsApi, daysApi } from '../../api/client'
@@ -51,6 +51,7 @@ import { resolveLegMode } from './legMode'
 import { usePluginDaySchedule, usePluginDayTints, dayTintBackground, dayTinted, PluginDayScheduleRow, formatScheduleMinutes } from '../Plugins/PluginDaySchedule'
 import { MobileAddPlaceButton } from './DayPlanSidebarMobileAddPlaceButton'
 import { DayPlanSidebarToolbar } from './DayPlanSidebarToolbar'
+import VoyaDayEditModal from './VoyaDayEditModal'
 import { DayPlanSidebarNoteModal } from './DayPlanSidebarNoteModal'
 import { DayPlanSidebarTimeConfirmModal } from './DayPlanSidebarTimeConfirmModal'
 import { DayPlanSidebarTransportDetailModal } from './DayPlanSidebarTransportDetailModal'
@@ -1249,6 +1250,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
   // element exists rather than on a mount that may render nothing yet.
   const [panel, setPanel] = useState<HTMLElement | null>(null)
   const [narrowPanel, setNarrowPanel] = useState(false)
+  const [voyaEditOpen, setVoyaEditOpen] = useState(false)
   useEffect(() => {
     if (!panel || typeof ResizeObserver === 'undefined') return
     const measure = (): void => setNarrowPanel(panel.clientWidth < NARROW_PLAN_PX)
@@ -1562,6 +1564,27 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
         onReorderDays={onReorderDays}
         onAddDay={onAddDay}
       />
+
+      {selectedDayId != null && canEditDays && (
+        <div className="px-3 pt-2">
+          <button
+            type="button"
+            onClick={() => setVoyaEditOpen(true)}
+            className="group flex w-full items-center justify-between gap-3 rounded-full border border-[#B8D2F5]/35 bg-[linear-gradient(145deg,rgba(241,248,255,.78),rgba(255,255,255,.62))] px-3.5 py-2 text-left transition-all hover:border-[#377CF6]/30 hover:bg-[#377CF6]/5 dark:border-white/7 dark:bg-white/4"
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[#377CF6] text-white shadow-[0_6px_16px_rgba(55,124,246,.20)]">
+                <Sparkles size={12} strokeWidth={2.3} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[11px] font-semibold text-content">Ask Voya about this day</span>
+                <span className="block truncate text-[10px] text-content-faint">Relax it, reorder it, swap stops, or shape the evening.</span>
+              </span>
+            </span>
+            <ChevronRight size={13} className="flex-none text-[#377CF6] transition-transform group-hover:translate-x-0.5" />
+          </button>
+        </div>
+      )}
 
       {/* Tagesliste */}
       <div className={`scroll-container${draggingId ? '' : ' trek-stagger'}`} style={{ flex: 1, overflowY: 'auto', minHeight: 0 }} ref={scrollContainerRef} onScroll={(e) => onScrollTopChange?.((e.currentTarget as HTMLElement).scrollTop)}>
@@ -2993,6 +3016,28 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
       <DayPlanSidebarFooter totalCostLabel={totalCostLabel} t={t} />
       <ContextMenu menu={ctxMenu.menu} onClose={ctxMenu.close} />
     </div>
+      {(() => {
+        if (selectedDayId == null) return null
+        const day = days.find(candidate => candidate.id === selectedDayId)
+        if (!day) return null
+        const dayIndex = days.findIndex(candidate => candidate.id === day.id)
+        const dayLabel = day.title || `Day ${day.day_number ?? dayIndex + 1}`
+        return (
+          <VoyaDayEditModal
+            isOpen={voyaEditOpen}
+            onClose={() => setVoyaEditOpen(false)}
+            tripId={tripId}
+            dayId={day.id}
+            dayLabel={dayLabel}
+            assignments={assignments[String(day.id)] || []}
+            onApplied={async () => {
+              await useTripStore.getState().loadTrip(tripId)
+              onRouteRefresh?.()
+              toast.success('Voya updated this day.')
+            }}
+          />
+        )
+      })()}
   )
 })
 
