@@ -100,6 +100,7 @@ export class VoyaAiService {
     private readonly settings: SettingsService,
     private readonly transit: TransitService,
     private readonly roadRouter: RoadtripRouterService,
+    private readonly todo: TodoService,
   ) {}
 
   async resolveDestination(
