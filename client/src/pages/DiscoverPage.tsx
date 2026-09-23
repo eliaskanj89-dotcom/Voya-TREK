@@ -462,12 +462,31 @@ function DestinationCard({
         </div>
 
         {visual && (
-          <div className="absolute bottom-2 right-2 z-20 max-w-[72%] truncate rounded-full bg-black/30 px-2 py-1 text-[8px] font-medium text-white/72 backdrop-blur-xl">
-            {visual.source === 'google'
-              ? 'Google photo'
-              : [visual.source === 'wikimedia' ? 'Wikimedia' : visual.source === 'wikipedia' ? 'Wikipedia' : 'Cached photo', visual.attribution].filter(Boolean).join(' · ')}
-            {visual.license ? ` · ${visual.license}` : ''}
-          </div>
+          visual.sourceUrl || visual.licenseUrl ? (
+            <a
+              href={visual.sourceUrl || visual.licenseUrl || undefined}
+              target="_blank"
+              rel="noreferrer"
+              onClick={event => event.stopPropagation()}
+              className="absolute bottom-2 right-2 z-20 max-w-[76%] truncate rounded-full bg-black/34 px-2 py-1 text-[8px] font-medium text-white/76 backdrop-blur-xl hover:bg-black/46 hover:text-white"
+              title={[visual.attribution, visual.license].filter(Boolean).join(' · ') || 'Photo source'}
+            >
+              {visual.source === 'google'
+                ? 'Google photo'
+                : [visual.source === 'wikimedia' ? 'Wikimedia' : visual.source === 'wikipedia' ? 'Wikipedia' : 'Cached photo', visual.attribution].filter(Boolean).join(' · ')}
+              {visual.license ? ` · ${visual.license}` : ''}
+            </a>
+          ) : (
+            <div
+              className="absolute bottom-2 right-2 z-20 max-w-[76%] truncate rounded-full bg-black/34 px-2 py-1 text-[8px] font-medium text-white/76 backdrop-blur-xl"
+              title={[visual.attribution, visual.license].filter(Boolean).join(' · ') || 'Photo source'}
+            >
+              {visual.source === 'google'
+                ? 'Google photo'
+                : [visual.source === 'wikimedia' ? 'Wikimedia' : visual.source === 'wikipedia' ? 'Wikipedia' : 'Cached photo', visual.attribution].filter(Boolean).join(' · ')}
+              {visual.license ? ` · ${visual.license}` : ''}
+            </div>
+          )
         )}
       </div>
 
