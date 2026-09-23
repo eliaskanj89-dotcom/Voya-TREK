@@ -23,6 +23,9 @@ export interface BackgroundVoyaTask {
   verified?: number
   unresolved?: number
   optimizedDays?: number
+  readinessRefreshed?: boolean
+  healthScore?: number
+  healthLabel?: 'Excellent' | 'Strong' | 'Needs attention' | 'At risk'
   error?: string
 }
 
@@ -64,7 +67,14 @@ interface BackgroundTasksState {
   markConsumed: (id: string) => void
   dismiss: (id: string) => void
   addVoyaTask: (task: { id: string; tripId: string; label: string }) => void
-  setVoyaDone: (id: string, result: { verified: number; unresolved: number; optimizedDays: number }) => void
+  setVoyaDone: (id: string, result: {
+    verified: number
+    unresolved: number
+    optimizedDays: number
+    readinessRefreshed?: boolean
+    healthScore?: number
+    healthLabel?: 'Excellent' | 'Strong' | 'Needs attention' | 'At risk'
+  }) => void
   setVoyaError: (id: string, error: string) => void
   dismissVoya: (id: string) => void
 }
