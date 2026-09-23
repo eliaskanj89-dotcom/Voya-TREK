@@ -355,6 +355,22 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
   // the day-header tram button and the modal's mode switch — is off without one.
   const tripHasDates = Boolean(trip?.start_date && trip?.end_date)
   const loadBudgetItems = useTripStore(s => s.loadBudgetItems)
+  const hydrateActiveTrip = useTripStore(s => s.hydrateActiveTrip)
+
+  useEffect(() => {
+    const refreshFromVoya = (event: Event) => {
+      const detail = (event as CustomEvent<{ tripId?: number }>).detail
+      if (detail?.tripId !== tripId) return
+      void hydrateActiveTrip(tripId)
+    }
+    window.addEventListener('voya:enrichment-complete', refreshFromVoya)
+    window.addEventListener('voya:places-verified', refreshFromVoya)
+    return () => {
+      window.removeEventListener('voya:enrichment-complete', refreshFromVoya)
+      window.removeEventListener('voya:places-verified', refreshFromVoya)
+    }
+  }, [tripId, hydrateActiveTrip])
+
   const [bookingExpense, setBookingExpense] = useState<{ editing: BudgetItem | null; prefill?: ExpensePrefill } | null>(null)
   const openBookingExpense = (req: BookingExpenseRequest) => {
     if (req.editItem) setBookingExpense({ editing: req.editItem })
