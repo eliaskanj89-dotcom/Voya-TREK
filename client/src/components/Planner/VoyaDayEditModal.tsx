@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Sparkles } from 'lucide-react'
 import type { Assignment, VoyaDayEditDraft } from '@trek/shared'
 import Modal from '../shared/Modal'
@@ -13,6 +13,8 @@ interface VoyaDayEditModalProps {
   dayLabel: string
   assignments: Assignment[]
   onApplied: () => Promise<void> | void
+  initialInstruction?: string
+  autoPreview?: boolean
 }
 
 const EXAMPLES = [
@@ -30,12 +32,15 @@ export default function VoyaDayEditModal({
   dayLabel,
   assignments,
   onApplied,
+  initialInstruction = '',
+  autoPreview = false,
 }: VoyaDayEditModalProps) {
   const [instruction, setInstruction] = useState('')
   const [draft, setDraft] = useState<VoyaDayEditDraft | null>(null)
   const [generating, setGenerating] = useState(false)
   const [applying, setApplying] = useState(false)
   const [error, setError] = useState('')
+  const seededRef = useRef<string>('')
 
   const assignmentById = useMemo(
     () => new Map(assignments.map(assignment => [assignment.id, assignment])),
@@ -50,8 +55,8 @@ export default function VoyaDayEditModal({
     onClose()
   }
 
-  const generate = async () => {
-    const text = instruction.trim()
+  const generate = async (override?: string) => {
+    const text = (override ?? instruction).trim()
     if (text.length < 3) {
       setError('Tell Voya what you want to change first.')
       return
@@ -72,6 +77,22 @@ export default function VoyaDayEditModal({
       setGenerating(false)
     }
   }
+
+  useEffect(() => {
+    if (!isOpen || !initialInstruction.trim()) {
+      if (!isOpen) seededRef.current = ''
+      return
+    }
+    const seedKey = `${dayId}:${initialInstruction}`
+    if (seededRef.current === seedKey) return
+    seededRef.current = seedKey
+    setInstruction(initialInstruction)
+    setDraft(null)
+    setError('')
+    if (autoPreview) {
+      void generate(initialInstruction)
+    }
+  }, [isOpen, dayId, initialInstruction, autoPreview])
 
   const apply = async () => {
     if (!draft) return
