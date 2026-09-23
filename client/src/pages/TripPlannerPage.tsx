@@ -35,6 +35,7 @@ import { lazyWithRetry } from '../utils/lazyWithRetry'
 import { getDayBookendHotels } from '../utils/dayOrder'
 import TripWarningsBanner from '../components/Planner/TripWarningsBanner'
 import VoyaReadinessPanel from '../components/Planner/VoyaReadinessPanel'
+import VoyaTripHealthPanel from '../components/Planner/VoyaTripHealthPanel'
 import Navbar from '../components/Layout/Navbar'
 import { useToast } from '../components/shared/Toast'
 import { Map, X, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Ticket, PackageCheck, Wallet, FolderOpen, Users, Train } from 'lucide-react'
@@ -413,6 +414,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
             plugins with a tab here, floating bottom overlay for the rest. */}
         <TripWarningsBanner tripId={tripId} onOpenPluginTab={(pid) => handleTabChange(`plugin:${pid}`)} />
         <VoyaReadinessPanel tripId={tripId} />
+        <VoyaTripHealthPanel tripId={tripId} />
 
         {activeTab === 'plan' && (
           <div style={{ position: 'absolute', inset: 0 }}>
