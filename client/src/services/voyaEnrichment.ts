@@ -30,6 +30,7 @@ export function startVoyaEnrichment(tripId: number): void {
     try {
       await voyaAiApi.refreshReadiness({ tripId })
       readinessRefreshed = true
+      window.dispatchEvent(new CustomEvent('voya:readiness-updated', { detail: { tripId } }))
     } catch {
       // Readiness refresh needs a configured LLM. Verification and route
       // optimization are still useful and must not be downgraded to an error.
@@ -41,6 +42,9 @@ export function startVoyaEnrichment(tripId: number): void {
       const health = await voyaAiApi.tripHealth({ tripId })
       healthScore = health.score
       healthLabel = health.label
+      window.dispatchEvent(new CustomEvent('voya:trip-health-updated', {
+        detail: { tripId, score: health.score, label: health.label },
+      }))
     } catch {
       // Trip Health is deterministic, but enrichment completion should not fail
       // solely because the summary audit could not be loaded afterward.
