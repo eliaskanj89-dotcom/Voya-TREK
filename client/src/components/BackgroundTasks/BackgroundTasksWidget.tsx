@@ -7,6 +7,7 @@ import { addListener, removeListener } from '../../api/websocket'
 import { reservationsApi, healthApi } from '../../api/client'
 import { saveImportFiles } from '../../db/offlineDb'
 import { useBackgroundTasksStore, type BackgroundImportTask } from '../../store/backgroundTasksStore'
+import { resumeVoyaEnrichment } from '../../services/voyaEnrichment'
 
 /**
  * Global, route-independent widget (bottom-right) that tracks background booking
@@ -63,7 +64,8 @@ export default function BackgroundTasksWidget() {
   useEffect(() => {
     if (didRehydrate.current) return
     didRehydrate.current = true
-    const restored = useBackgroundTasksStore.getState().tasks
+    const restoredState = useBackgroundTasksStore.getState()
+    const restored = restoredState.tasks
     for (const task of restored) {
       reservationsApi
         .importJobStatus(task.tripId, task.id)
@@ -76,6 +78,19 @@ export default function BackgroundTasksWidget() {
           if (err?.response?.status === 404) dismiss(task.id)
         })
     }
+
+    // Voya refinement is client-orchestrated but idempotent. If the browser was
+    // reloaded mid-run, restart the same task id instead of silently abandoning it.
+    for (const task of restoredState.voyaTasks) {
+      if (task.status !== 'running') continue
+      const numericTripId = Number(task.tripId)
+      if (!Number.isFinite(numericTripId) || numericTripId <= 0) {
+        useBackgroundTasksStore.getState().setVoyaError(task.id, 'Voya could not resume this refinement task.')
+        continue
+      }
+      resumeVoyaEnrichment(task.id, numericTripId)
+    }
+
     // run once on mount against whatever was rehydrated from storage
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
