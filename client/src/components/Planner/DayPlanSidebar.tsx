@@ -1573,9 +1573,11 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
       />
 
       <VoyaJourneyStrip
+        tripId={tripId}
         days={days}
         selectedDayId={selectedDayId}
         onSelectDay={(dayId) => onSelectDay(dayId, false)}
+        onAddTransport={(dayId) => onAddReservation(dayId)}
       />
 
       <div className="px-3 pt-2">
