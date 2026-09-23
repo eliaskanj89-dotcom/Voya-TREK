@@ -53,6 +53,7 @@ import { MobileAddPlaceButton } from './DayPlanSidebarMobileAddPlaceButton'
 import { DayPlanSidebarToolbar } from './DayPlanSidebarToolbar'
 import VoyaDayEditModal from './VoyaDayEditModal'
 import VoyaTripEditModal from './VoyaTripEditModal'
+import VoyaEditHistoryModal from './VoyaEditHistoryModal'
 import VoyaLiveTripCard from './VoyaLiveTripCard'
 import VoyaJourneyStrip from './VoyaJourneyStrip'
 import { DayPlanSidebarNoteModal } from './DayPlanSidebarNoteModal'
@@ -1255,6 +1256,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
   const [narrowPanel, setNarrowPanel] = useState(false)
   const [voyaEditOpen, setVoyaEditOpen] = useState(false)
   const [voyaTripEditOpen, setVoyaTripEditOpen] = useState(false)
+  const [voyaHistoryOpen, setVoyaHistoryOpen] = useState(false)
   useEffect(() => {
     if (!panel || typeof ResizeObserver === 'undefined') return
     const measure = (): void => setNarrowPanel(panel.clientWidth < NARROW_PLAN_PX)
@@ -1617,6 +1619,15 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
           >
             <Sparkles size={12} strokeWidth={2.2} />
             <span>{selectedDayId == null ? 'Ask Voya · Whole trip' : 'Whole trip'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setVoyaHistoryOpen(true)}
+            className="group flex flex-none items-center justify-center gap-1.5 rounded-full border border-[#B8D2F5]/35 bg-white/55 px-3 py-2 text-[10px] font-semibold text-content-muted transition-all hover:border-[#377CF6]/30 hover:bg-[#377CF6]/5 hover:text-[#377CF6] dark:border-white/7 dark:bg-white/4"
+            title="Voya AI edit history"
+          >
+            <Clock size={12} strokeWidth={2.2} />
+            <span className={selectedDayId == null ? '' : 'hidden xl:inline'}>History</span>
           </button>
         </div>
       )}
@@ -3061,6 +3072,17 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
         onDayApplied={async () => {
           await useTripStore.getState().loadTrip(tripId)
           onRouteRefresh?.()
+        }}
+      />
+      <VoyaEditHistoryModal
+        isOpen={voyaHistoryOpen}
+        onClose={() => setVoyaHistoryOpen(false)}
+        tripId={tripId}
+        days={days}
+        onRestored={async () => {
+          await useTripStore.getState().loadTrip(tripId)
+          onRouteRefresh?.()
+          toast.success('Voya restored that itinerary version.')
         }}
       />
 
