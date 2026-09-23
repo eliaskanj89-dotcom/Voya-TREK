@@ -510,6 +510,11 @@ function createTables(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_voya_readiness_trip ON voya_readiness_items(trip_id);
     CREATE INDEX IF NOT EXISTS idx_voya_readiness_trip_status ON voya_readiness_items(trip_id, status);
+    CREATE TABLE IF NOT EXISTS voya_readiness_state (
+      trip_id INTEGER PRIMARY KEY REFERENCES trips(id) ON DELETE CASCADE,
+      fingerprint TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
 
     CREATE TABLE IF NOT EXISTS collab_notes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
