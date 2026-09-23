@@ -151,7 +151,7 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
   const hasUncategorized = places.some(p => p.category_id == null)
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="voya-mobile-places flex h-full flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(var(--bottom-nav-h,84px)+22px)] pt-[calc(var(--m-safe-top,12px)+58px)]">
         {/* ── Filter chips + Import (Add sits in the search row below to free space) ── */}
         <div className="flex items-center gap-[6px]">
@@ -347,7 +347,7 @@ export default function MPlacesBrowser({ planner, shell }: MPlacesBrowserProps) 
             const dayNumber = dayNumberByPlace.get(place.id)
             const sub = place.address || place.description
             return (
-              <div key={place.id} className="flex items-center gap-[11px] border-b border-[color:var(--m-rowbr)] px-[2px] py-[9px]">
+              <div key={place.id} className="voya-mobile-place-row flex items-center gap-[11px] border border-[color:var(--m-rowbr)] px-[10px] py-[10px]">
                 <button type="button" onClick={() => openRow(place)} className="flex min-w-0 flex-1 items-center gap-[11px] text-left">
                   {selectMode && <SquareCheck big checked={selectedIds.has(place.id)} />}
                   <PlaceAvatar place={place} category={cat} size={40} />
