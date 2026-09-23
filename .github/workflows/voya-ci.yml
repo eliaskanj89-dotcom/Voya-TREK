@@ -1,6 +1,9 @@
 name: Voya migration CI
 
 on:
+  push:
+    branches:
+      - voya-rebrand
   pull_request:
     branches:
       - main
