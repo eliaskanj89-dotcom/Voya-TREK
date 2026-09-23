@@ -77,7 +77,7 @@ export default function VoyaReadinessPanel({ tripId }: VoyaReadinessPanelProps) 
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => { setOpen(true); void load() }}
         className="voya-readiness-pill absolute right-4 top-3 z-[80] flex items-center gap-2 rounded-full border border-[#B9D3F7]/45 bg-[rgba(248,252,255,.88)] px-3 py-2 text-left shadow-[0_12px_30px_rgba(31,67,112,.12)] backdrop-blur-[22px] transition-all hover:-translate-y-px hover:border-[#377CF6]/30 hover:shadow-[0_16px_38px_rgba(31,67,112,.16)] dark:border-white/10 dark:bg-[rgba(10,25,44,.78)]"
         aria-label="Open Before You Go readiness"
       >
