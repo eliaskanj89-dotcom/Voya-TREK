@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   type VoyaApplyDayEditRequest,
+  type VoyaApplyTripEditRequest,
   type VoyaDayEditDraft,
   type VoyaDayEditRequest,
   type VoyaMaterializeDraftRequest,
@@ -26,6 +27,7 @@ import {
   voyaDestinationDiscoveryResultSchema,
   voyaMultiCityPlanDraftSchema,
   voyaDestinationResolveResultSchema,
+  voyaApplyTripEditRequestSchema,
   voyaDayEditDraftSchema,
   voyaPlanDraftResponseSchema,
   voyaTravelerDnaSchema,
@@ -806,6 +808,79 @@ export class VoyaAiService {
     const current = this.assignments.listDayAssignments(draft.dayId);
     this.assertDayEditDraft(draft, current);
 
+    const mutation = this.db.transaction(() =>
+      this.applyDayEditMutation(draft, current, day, trip.title || 'this trip'),
+    );
+
+    this.broadcastDayEditMutation(draft.tripId, draft.dayId, mutation);
+    this.assignments.reconcile(draft.tripId);
+    return mutation.result;
+  }
+
+  applyTripEdit(user: User, body: VoyaApplyTripEditRequest) {
+    const parsed = voyaApplyTripEditRequestSchema.parse(body);
+    const tripId = parsed.plan.tripId;
+    const trip = this.days.verifyTripAccess(tripId, user.id);
+    if (!trip) throw new VoyaAiPermissionError('Trip not found');
+    if (!this.days.canEdit(trip, user)) throw new VoyaAiPermissionError('No permission to edit this trip');
+
+    this.assertTripEditPlan(parsed.plan, this.days.list(tripId).days.map(day => day.id));
+
+    const expectedDayIds = parsed.plan.affectedDays.map(item => item.dayId);
+    const draftDayIds = parsed.drafts.map(draft => draft.dayId);
+    const uniqueDraftDayIds = new Set(draftDayIds);
+
+    if (uniqueDraftDayIds.size !== draftDayIds.length) {
+      throw new VoyaAiInvalidDraftError('Whole-trip edit contains duplicate day drafts');
+    }
+    if (
+      expectedDayIds.length !== draftDayIds.length ||
+      expectedDayIds.some(dayId => !uniqueDraftDayIds.has(dayId))
+    ) {
+      throw new VoyaAiInvalidDraftError('Every affected day must have exactly one reviewed draft before applying');
+    }
+    for (const draft of parsed.drafts) {
+      if (draft.tripId !== tripId) {
+        throw new VoyaAiInvalidDraftError('All reviewed day drafts must belong to the same trip');
+      }
+    }
+
+    const contexts = parsed.drafts.map(draft => {
+      const day = this.days.getDay(draft.dayId, tripId);
+      if (!day) throw new VoyaAiInvalidDraftError(`Day ${draft.dayId} no longer exists`);
+      const current = this.assignments.listDayAssignments(draft.dayId);
+      this.assertDayEditDraft(draft, current);
+      return { draft, day, current };
+    });
+
+    const mutations = this.db.transaction(() =>
+      contexts.map(({ draft, day, current }) =>
+        this.applyDayEditMutation(draft, current, day, trip.title || 'this trip'),
+      ),
+    );
+
+    for (let index = 0; index < contexts.length; index++) {
+      this.broadcastDayEditMutation(
+        tripId,
+        contexts[index].draft.dayId,
+        mutations[index],
+      );
+    }
+    this.assignments.reconcile(tripId);
+
+    return {
+      tripId,
+      affectedDays: contexts.map(({ draft }) => draft.dayId),
+      appliedDays: contexts.length,
+    };
+  }
+
+  private applyDayEditMutation(
+    draft: VoyaDayEditDraft,
+    current: ReturnType<AssignmentsService['listDayAssignments']>,
+    day: NonNullable<ReturnType<DaysService['getDay']>>,
+    tripTitle: string,
+  ) {
     const currentByAssignment = new Map(current.map(a => [a.id, a]));
     const keptExistingIds = new Set(
       draft.sequence.filter(item => item.kind === 'existing').map(item => item.assignmentId),
@@ -814,115 +889,121 @@ export class VoyaAiService {
       this.places.list(String(draft.tripId), { assignment: 'all' })
         .map(place => destinationFromNotes(place.notes))
         .find(Boolean)
-      || trip.title
+      || tripTitle
       || 'this trip';
 
     const createdPlaces: Array<ReturnType<PlacesService['create']>> = [];
     const createdAssignments: Array<NonNullable<ReturnType<AssignmentsService['createAssignment']>>> = [];
     const removedIds = [...draft.removedAssignmentIds];
 
-    const result = this.db.transaction(() => {
-      for (const id of removedIds) this.assignments.deleteAssignment(id);
+    for (const id of removedIds) this.assignments.deleteAssignment(id);
 
-      const finalIds: number[] = [];
-      const timeEdits: Array<{ id: number; start?: string | null; end?: string | null; notes?: string | null }> = [];
+    const finalIds: number[] = [];
+    const timeEdits: Array<{ id: number; start?: string | null; end?: string | null; notes?: string | null }> = [];
 
-      for (const item of draft.sequence) {
-        if (item.kind === 'existing') {
-          const existing = currentByAssignment.get(item.assignmentId);
-          if (!existing) throw new VoyaAiInvalidDraftError(`Assignment ${item.assignmentId} no longer exists`);
-          finalIds.push(existing.id);
-          timeEdits.push({ id: existing.id, start: item.startTime, end: item.endTime, notes: item.notes });
-          continue;
-        }
+    for (const item of draft.sequence) {
+      if (item.kind === 'existing') {
+        const existing = currentByAssignment.get(item.assignmentId);
+        if (!existing) throw new VoyaAiInvalidDraftError(`Assignment ${item.assignmentId} no longer exists`);
+        finalIds.push(existing.id);
+        timeEdits.push({ id: existing.id, start: item.startTime, end: item.endTime, notes: item.notes });
+        continue;
+      }
 
-        const activity = item.activity;
-        const matchingPlaceId = this.places.findMatchingPlaceId(String(draft.tripId), { name: activity.name });
-        let placeId = matchingPlaceId;
+      const activity = item.activity;
+      const matchingPlaceId = this.places.findMatchingPlaceId(String(draft.tripId), { name: activity.name });
+      let placeId = matchingPlaceId;
 
-        if (matchingPlaceId != null) {
-          const duplicateKept = current.some(
-            a => a.place_id === matchingPlaceId && keptExistingIds.has(a.id),
-          );
-          if (duplicateKept) {
-            throw new VoyaAiInvalidDraftError(`The proposed new stop "${activity.name}" is already kept on this day`);
-          }
-        } else {
-          const suggestionNote = [
-            'Suggested by Voya — verify current details before relying on them.',
-            `Voya destination: ${destinationHint}.`,
-            activity.notes,
-            activity.reservationRecommended ? 'Reservation may be worth checking.' : '',
-            activity.priceLabel,
-          ].filter(Boolean).join(' ');
-
-          const place = this.places.create(String(draft.tripId), {
-            name: activity.name,
-            description: activity.description,
-            address: activity.addressQuery || activity.area,
-            duration_minutes: activity.durationMin,
-            place_time: activity.startTime,
-            notes: suggestionNote,
-          });
-          placeId = place.id;
-          createdPlaces.push(place);
-        }
-
-        const assignment = this.assignments.createAssignment(
-          draft.dayId,
-          placeId!,
-          'Suggested by Voya — review current details before relying on them.',
+      if (matchingPlaceId != null) {
+        const duplicateKept = current.some(
+          a => a.place_id === matchingPlaceId && keptExistingIds.has(a.id),
         );
-        if (!assignment) throw new VoyaAiInvalidDraftError(`Could not add "${activity.name}" to this day`);
-        createdAssignments.push(assignment);
-        finalIds.push(assignment.id);
-        timeEdits.push({ id: assignment.id, start: activity.startTime ?? undefined });
-      }
-
-      for (const edit of timeEdits) {
-        if (edit.start !== undefined || edit.end !== undefined) {
-          this.assignments.updateTime(edit.id, edit.start, edit.end);
+        if (duplicateKept) {
+          throw new VoyaAiInvalidDraftError(`The proposed new stop "${activity.name}" is already kept on this day`);
         }
-        if (edit.notes !== undefined) this.assignments.updateNotes(edit.id, edit.notes ?? null);
+      } else {
+        const suggestionNote = [
+          'Suggested by Voya — verify current details before relying on them.',
+          `Voya destination: ${destinationHint}.`,
+          activity.notes,
+          activity.reservationRecommended ? 'Reservation may be worth checking.' : '',
+          activity.priceLabel,
+        ].filter(Boolean).join(' ');
+
+        const place = this.places.create(String(draft.tripId), {
+          name: activity.name,
+          description: activity.description,
+          address: activity.addressQuery || activity.area,
+          duration_minutes: activity.durationMin,
+          place_time: activity.startTime,
+          notes: suggestionNote,
+        });
+        placeId = place.id;
+        createdPlaces.push(place);
       }
 
-      this.assignments.reorderAssignments(draft.dayId, finalIds);
+      const assignment = this.assignments.createAssignment(
+        draft.dayId,
+        placeId!,
+        'Suggested by Voya — review current details before relying on them.',
+      );
+      if (!assignment) throw new VoyaAiInvalidDraftError(`Could not add "${activity.name}" to this day`);
+      createdAssignments.push(assignment);
+      finalIds.push(assignment.id);
+      timeEdits.push({ id: assignment.id, start: activity.startTime ?? undefined });
+    }
 
-      const updatedDay = this.days.update(draft.dayId, day, {
-        ...(draft.title ? { title: draft.title } : {}),
-        ...(draft.objective !== undefined ? { notes: draft.objective } : {}),
-      });
+    for (const edit of timeEdits) {
+      if (edit.start !== undefined || edit.end !== undefined) {
+        this.assignments.updateTime(edit.id, edit.start, edit.end);
+      }
+      if (edit.notes !== undefined) this.assignments.updateNotes(edit.id, edit.notes ?? null);
+    }
 
-      return {
-        day: updatedDay,
-        assignments: this.assignments.listDayAssignments(draft.dayId),
-      };
+    this.assignments.reorderAssignments(draft.dayId, finalIds);
+
+    const updatedDay = this.days.update(draft.dayId, day, {
+      ...(draft.title ? { title: draft.title } : {}),
+      ...(draft.objective !== undefined ? { notes: draft.objective } : {}),
     });
 
-    for (const place of createdPlaces) {
-      this.places.broadcast(String(draft.tripId), 'place:created', { place }, undefined);
+    return {
+      result: {
+        day: updatedDay,
+        assignments: this.assignments.listDayAssignments(draft.dayId),
+      },
+      createdPlaces,
+      createdAssignments,
+      removedIds,
+    };
+  }
+
+  private broadcastDayEditMutation(
+    tripId: number,
+    dayId: number,
+    mutation: ReturnType<VoyaAiService['applyDayEditMutation']>,
+  ): void {
+    for (const place of mutation.createdPlaces) {
+      this.places.broadcast(String(tripId), 'place:created', { place }, undefined);
     }
-    for (const assignment of createdAssignments) {
-      this.assignments.broadcast(String(draft.tripId), 'assignment:created', { assignment }, undefined);
+    for (const assignment of mutation.createdAssignments) {
+      this.assignments.broadcast(String(tripId), 'assignment:created', { assignment }, undefined);
     }
-    for (const assignmentId of removedIds) {
+    for (const assignmentId of mutation.removedIds) {
       this.assignments.broadcast(
-        String(draft.tripId),
+        String(tripId),
         'assignment:deleted',
-        { assignmentId, dayId: draft.dayId },
+        { assignmentId, dayId },
         undefined,
       );
     }
     this.assignments.broadcast(
-      String(draft.tripId),
+      String(tripId),
       'assignment:reordered',
-      { dayId: draft.dayId, orderedIds: result.assignments.map(a => a.id) },
+      { dayId, orderedIds: mutation.result.assignments.map(a => a.id) },
       undefined,
     );
-    this.days.broadcast(String(draft.tripId), 'day:updated', { day: result.day }, undefined);
-    this.assignments.reconcile(draft.tripId);
-
-    return result;
+    this.days.broadcast(String(tripId), 'day:updated', { day: mutation.result.day }, undefined);
   }
 
   async verifyTrip(user: User, request: VoyaVerifyTripRequest): Promise<VoyaVerifyTripResult> {
