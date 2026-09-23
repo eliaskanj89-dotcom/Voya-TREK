@@ -53,6 +53,7 @@ import { MobileAddPlaceButton } from './DayPlanSidebarMobileAddPlaceButton'
 import { DayPlanSidebarToolbar } from './DayPlanSidebarToolbar'
 import VoyaDayEditModal from './VoyaDayEditModal'
 import VoyaTripEditModal from './VoyaTripEditModal'
+import VoyaLiveTripCard from './VoyaLiveTripCard'
 import { DayPlanSidebarNoteModal } from './DayPlanSidebarNoteModal'
 import { DayPlanSidebarTimeConfirmModal } from './DayPlanSidebarTimeConfirmModal'
 import { DayPlanSidebarTransportDetailModal } from './DayPlanSidebarTransportDetailModal'
@@ -1567,6 +1568,18 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
         onReorderDays={onReorderDays}
         onAddDay={onAddDay}
       />
+
+      <div className="px-3 pt-2">
+        <VoyaLiveTripCard
+          tripId={tripId}
+          days={days}
+          assignments={assignments}
+          accommodations={accommodations}
+          selectedDayId={selectedDayId}
+          onOpenToday={(dayId) => onSelectDay(dayId, false)}
+          onRouteRefresh={onRouteRefresh}
+        />
+      </div>
 
       {canEditDays && (
         <div className="flex gap-2 px-3 pt-2">
