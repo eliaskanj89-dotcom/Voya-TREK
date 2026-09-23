@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Check, ChevronDown, ChevronRight, Sparkles } from 'lucide-react'
-import type { AssignmentsMap, Day, VoyaDayEditDraft, VoyaTripEditPlan } from '@trek/shared'
+import type { Day, VoyaDayEditDraft, VoyaTripEditPlan } from '@trek/shared'
 import Modal from '../shared/Modal'
 import { voyaAiApi } from '../../api/client'
-import { getApiErrorMessage } from '../../types'
+import { getApiErrorMessage, type AssignmentsMap } from '../../types'
 
 interface VoyaTripEditModalProps {
   isOpen: boolean
