@@ -5226,6 +5226,32 @@ function runMigrations(db: Database.Database): void {
       const seated = reseatBookedNights(db);
       if (seated > 0) console.log(`[DB] Seated ${seated} booked night(s) at the head of their day`);
     },
+
+    /*
+     * Voya Before You Go / Readiness. Trip-scoped, shared by collaborators.
+     * Generated tasks are intentionally factual follow-ups, not booking records.
+     */
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS voya_readiness_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          trip_id INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          priority TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'To do',
+          reason TEXT NOT NULL,
+          action_label TEXT,
+          day_id INTEGER REFERENCES days(id) ON DELETE SET NULL,
+          place_id INTEGER REFERENCES places(id) ON DELETE SET NULL,
+          fingerprint TEXT,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_voya_readiness_trip ON voya_readiness_items(trip_id);
+        CREATE INDEX IF NOT EXISTS idx_voya_readiness_trip_status ON voya_readiness_items(trip_id, status);
+      `);
+    },
   ];
 
   if (currentVersion < migrations.length) {
