@@ -15,6 +15,17 @@ import type { BookingImportPreviewItem, BookingImportMode } from '@trek/shared'
  * on mount. We deliberately persist neither the parsed `items` (re-fetched) nor the
  * transient review flags (so a reload never auto-reopens the review flow).
  */
+export interface BackgroundVoyaTask {
+  id: string
+  tripId: string
+  label: string
+  status: 'running' | 'done' | 'error'
+  verified?: number
+  unresolved?: number
+  optimizedDays?: number
+  error?: string
+}
+
 export interface BackgroundImportTask {
   id: string                 // server job id
   tripId: string
@@ -44,6 +55,7 @@ export interface BackgroundImportTask {
 
 interface BackgroundTasksState {
   tasks: BackgroundImportTask[]
+  voyaTasks: BackgroundVoyaTask[]
   addTask: (task: { id: string; tripId: string; label: string; total: number; files?: File[]; mode?: BookingImportMode; kind?: 'transports' | 'bookings' }) => void
   setProgress: (id: string, tripId: string, done: number, total: number) => void
   setDone: (id: string, tripId: string, items: BookingImportPreviewItem[], warnings: string[]) => void
@@ -51,6 +63,10 @@ interface BackgroundTasksState {
   requestReview: (id: string) => void
   markConsumed: (id: string) => void
   dismiss: (id: string) => void
+  addVoyaTask: (task: { id: string; tripId: string; label: string }) => void
+  setVoyaDone: (id: string, result: { verified: number; unresolved: number; optimizedDays: number }) => void
+  setVoyaError: (id: string, error: string) => void
+  dismissVoya: (id: string) => void
 }
 
 export const useBackgroundTasksStore = create<BackgroundTasksState>()(
@@ -71,6 +87,7 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>()(
 
       return {
         tasks: [],
+        voyaTasks: [],
         addTask: ({ id, tripId, label, total, files, mode, kind }) => upsert(id, tripId, { label, total, status: 'running', done: 0, sourceFiles: files, mode, kind }),
         setProgress: (id, tripId, done, total) => upsert(id, tripId, { done, total, status: 'running' }),
         setDone: (id, tripId, items, warnings) => upsert(id, tripId, { status: 'done', items, warnings, done: items?.length ?? 0 }),
@@ -78,6 +95,25 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>()(
         requestReview: (id) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, reviewRequested: true } : t)) })),
         markConsumed: (id) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, consumed: true, reviewRequested: false } : t)) })),
         dismiss: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
+        addVoyaTask: (task) => set((s) => ({
+          voyaTasks: [
+            ...s.voyaTasks.filter(existing => existing.id !== task.id),
+            { ...task, status: 'running' },
+          ],
+        })),
+        setVoyaDone: (id, result) => set((s) => ({
+          voyaTasks: s.voyaTasks.map(task =>
+            task.id === id ? { ...task, ...result, status: 'done' } : task
+          ),
+        })),
+        setVoyaError: (id, error) => set((s) => ({
+          voyaTasks: s.voyaTasks.map(task =>
+            task.id === id ? { ...task, error, status: 'error' } : task
+          ),
+        })),
+        dismissVoya: (id) => set((s) => ({
+          voyaTasks: s.voyaTasks.filter(task => task.id !== id),
+        })),
       }
     },
     {
