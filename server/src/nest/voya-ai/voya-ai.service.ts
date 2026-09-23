@@ -1199,6 +1199,14 @@ export class VoyaAiService {
         if (offset === 0 && index > 0 && day.isTransferDay !== true) {
           throw new VoyaAiInvalidDraftError(`The first day in ${leg.destination} must be marked as a transfer day`);
         }
+        if (day.isTransferDay) {
+          const localStops = day.activities.filter(activity => !isTransferActivity(activity.category, activity.name));
+          if (localStops.length > 4) {
+            throw new VoyaAiInvalidDraftError(
+              `Transfer day ${day.dayNumber} is overloaded with ${localStops.length} local stops; use at most 4`,
+            );
+          }
+        }
       }
       if (index > 0 && !leg.transportFromPrevious) {
         throw new VoyaAiInvalidDraftError(`${leg.destination} is missing a transfer mode from the previous city`);
