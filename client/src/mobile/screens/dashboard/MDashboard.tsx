@@ -308,6 +308,11 @@ export default function MDashboard(): React.ReactElement {
         trip={editingTrip}
         initialDestination={!editingTrip ? createSeed?.destination : undefined}
         initialDayCount={!editingTrip ? createSeed?.days : undefined}
+        initialVoyaSeed={!editingTrip && createSeed ? {
+          budgetStyle: createSeed.budgetStyle,
+          interests: createSeed.interests,
+          notes: createSeed.notes,
+        } : undefined}
         onClose={() => { setShowForm(false); setEditingTrip(null); setCreateSeed(null) }}
         onSave={editingTrip ? handleUpdate : handleCreate}
         onCoverUpdate={applyCoverUpdate}
