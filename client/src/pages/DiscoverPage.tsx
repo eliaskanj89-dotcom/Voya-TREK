@@ -366,6 +366,66 @@ export default function DiscoverPage() {
   )
 }
 
+function DestinationPosterFallback({
+  suggestion,
+  index,
+  loading,
+}: {
+  suggestion: VoyaDestinationSuggestion
+  index: number
+  loading: boolean
+}) {
+  const initials = suggestion.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase())
+    .join('')
+
+  const angle = [-8, 7, -4, 9][index % 4]
+  const primaryVibe = suggestion.vibe[0] || suggestion.type
+
+  return (
+    <div
+      aria-hidden="true"
+      className="absolute inset-0 overflow-hidden"
+      style={{ background: CARD_WASHES[index % CARD_WASHES.length] }}
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(55,124,246,.20),transparent_28%),radial-gradient(circle_at_86%_82%,rgba(119,174,255,.19),transparent_30%)]" />
+      <div
+        className="absolute -right-12 top-2 h-[190px] w-[190px] rounded-full border-[34px] border-[#377CF6]/8"
+        style={{ transform: `rotate(${angle}deg)` }}
+      />
+      <div className="absolute -left-8 bottom-[-78px] h-[168px] w-[168px] rounded-full border border-[#377CF6]/15 bg-white/24 backdrop-blur-sm dark:bg-white/5" />
+      <div className="absolute right-5 top-[58px] h-px w-[38%] bg-[#377CF6]/18" />
+      <div className="absolute right-5 top-[66px] h-px w-[24%] bg-[#377CF6]/12" />
+
+      <div className="absolute bottom-4 right-5 text-right">
+        <div className="voya-editorial text-[76px] font-medium leading-none tracking-[-.08em] text-[#377CF6]/10">
+          {initials || 'V'}
+        </div>
+        <div className="-mt-1 text-[8px] font-bold uppercase tracking-[.22em] text-[#245EBC]/34 dark:text-[#8DB9FF]/42">
+          {suggestion.country}
+        </div>
+      </div>
+
+      <div className="absolute left-5 top-[72px] max-w-[58%]">
+        <div className="text-[8px] font-bold uppercase tracking-[.20em] text-[#377CF6]/48">
+          Voya editorial
+        </div>
+        <div className="mt-2 h-px w-8 bg-[#377CF6]/28" />
+        <div className="mt-2 text-[10px] font-medium capitalize text-[#245EBC]/55 dark:text-[#A9CAFF]/55">
+          {primaryVibe}
+        </div>
+      </div>
+
+      {loading && (
+        <div className="absolute inset-0 animate-pulse bg-[linear-gradient(100deg,transparent_20%,rgba(255,255,255,.46)_44%,transparent_68%)] bg-[length:220%_100%]" />
+      )}
+    </div>
+  )
+}
+
 function DestinationCard({
   suggestion,
   index,
@@ -403,14 +463,11 @@ function DestinationCard({
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,20,39,.12)_0%,rgba(6,20,39,.28)_44%,rgba(6,20,39,.78)_100%)]" />
           </>
         ) : (
-          <>
-            <div className="absolute inset-0" style={{ background: CARD_WASHES[index % CARD_WASHES.length] }} />
-            <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full border-[26px] border-[#377CF6]/7" />
-            <div className="absolute -bottom-12 right-16 h-28 w-28 rounded-full bg-[#377CF6]/6 blur-2xl" />
-            {visualLoading && (
-              <div className="absolute inset-0 animate-pulse bg-[linear-gradient(100deg,transparent_20%,rgba(255,255,255,.48)_44%,transparent_68%)] bg-[length:220%_100%]" />
-            )}
-          </>
+          <DestinationPosterFallback
+            suggestion={suggestion}
+            index={index}
+            loading={visualLoading}
+          />
         )}
 
         <div className="relative z-10 flex min-h-[230px] flex-col justify-between p-5">
