@@ -302,7 +302,13 @@ export default function MVoyaPlanComposer({
                       onClick={() => chooseDestinationMatch(match)}
                       className="w-full rounded-[14px] border border-[color:var(--m-rowbr)] bg-[color:var(--m-ic)] px-3 py-2.5 text-left"
                     >
-                      <div className="font-geist text-[0.6875rem] font-bold text-m-ink">{match.name}</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-geist text-[0.6875rem] font-bold text-m-ink">{match.name}</div>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-geist text-[0.4375rem] font-bold uppercase tracking-[.06em] ${match.providerMatched ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-[color:var(--m-bg)] text-m-faint'}`}>
+                          {match.providerMatched && <Check size={8} strokeWidth={3} />}
+                          {match.providerMatched ? 'Map match' : 'AI match'}
+                        </span>
+                      </div>
                       <div className="mt-0.5 font-geist text-[0.5rem] font-bold uppercase tracking-[.08em] text-m-faint">
                         {[match.region, match.country].filter(Boolean).join(' · ')}
                       </div>
