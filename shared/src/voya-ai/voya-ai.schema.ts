@@ -299,6 +299,7 @@ export const voyaResolvedDestinationSchema = z.object({
   disambiguation: z.string().trim().max(180).optional(),
   subtitle: z.string().trim().min(1).max(220),
   searchTerm: z.string().trim().min(1).max(180),
+  providerMatched: z.boolean().default(false),
 });
 export type VoyaResolvedDestination = z.infer<typeof voyaResolvedDestinationSchema>;
 
