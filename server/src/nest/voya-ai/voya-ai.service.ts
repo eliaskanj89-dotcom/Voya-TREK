@@ -37,6 +37,7 @@ import {
   voyaDestinationDiscoveryResultSchema,
   voyaMultiCityPlanDraftSchema,
   voyaDestinationResolveResultSchema,
+  voyaResolvedDestinationSchema,
   voyaApplyTripEditRequestSchema,
   voyaDayEditDraftSchema,
   voyaPlanDraftResponseSchema,
@@ -68,7 +69,9 @@ const generatedReadinessSchema = z.object({
   items: z.array(voyaGeneratedReadinessItemSchema).max(12),
 });
 const generatedDestinationDiscoverySchema = voyaDestinationDiscoveryResultSchema.omit({ generatedBy: true });
-const generatedDestinationResolveSchema = voyaDestinationResolveResultSchema.omit({ generatedBy: true });
+const generatedDestinationResolveSchema = z.object({
+  suggestions: z.array(voyaResolvedDestinationSchema.omit({ providerMatched: true })).min(1).max(6),
+});
 
 export class VoyaAiUnavailableError extends Error {
   constructor() {
@@ -143,8 +146,12 @@ export class VoyaAiService {
           if (seen.has(key)) throw new VoyaAiInvalidDraftError(`Duplicate destination interpretation: ${suggestion.searchTerm}`);
           seen.add(key);
         }
+        const suggestions = await Promise.all(parsed.suggestions.map(async (suggestion) => ({
+          ...suggestion,
+          providerMatched: await this.destinationProviderMatch(user.id, suggestion),
+        })));
         return {
-          ...parsed,
+          suggestions,
           generatedBy: { provider: config.provider, model: config.model },
         };
       } catch (error) {
@@ -157,6 +164,44 @@ export class VoyaAiService {
     }
 
     throw new VoyaAiInvalidDraftError('Voya could not resolve this destination');
+  }
+
+  private async destinationProviderMatch(
+    userId: number,
+    suggestion: z.infer<typeof generatedDestinationResolveSchema>['suggestions'][number],
+  ): Promise<boolean> {
+    try {
+      const result = await this.maps.search(userId, suggestion.searchTerm);
+      const expectedName = canonicalPlaceName(suggestion.name);
+      const expectedCountry = canonicalPlaceName(suggestion.country);
+
+      return result.places.some((place) => {
+        const record = place as Record<string, unknown>;
+        const rawName = [record.name, record.display_name, record.displayName, record.mainText]
+          .find((value): value is string => typeof value === 'string' && value.trim().length > 0) || '';
+        const rawAddress = [record.address, record.formatted_address, record.formattedAddress]
+          .find((value): value is string => typeof value === 'string' && value.trim().length > 0) || '';
+
+        const candidateName = canonicalPlaceName(rawName);
+        const candidateAddress = canonicalPlaceName(rawAddress);
+        if (!candidateName) return false;
+
+        const nameMatches = candidateName === expectedName
+          || candidateName.includes(expectedName)
+          || expectedName.includes(candidateName);
+        if (!nameMatches) return false;
+
+        if (!expectedCountry) return true;
+        return candidateAddress.includes(expectedCountry)
+          || candidateName === expectedCountry
+          || canonicalPlaceName(suggestion.searchTerm).includes(expectedCountry);
+      });
+    } catch {
+      // Destination matching is a planning aid, not a hard dependency. If the
+      // maps stack is unavailable we keep the interpretation but mark it as
+      // uncorroborated instead of inventing certainty or blocking planning.
+      return false;
+    }
   }
 
   async discoverDestinations(
