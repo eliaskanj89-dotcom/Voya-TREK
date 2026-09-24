@@ -360,7 +360,13 @@ export default function VoyaPlanComposer({
                       onClick={() => chooseDestinationMatch(match)}
                       className="rounded-[16px] border border-edge-faint bg-surface-card px-3.5 py-3 text-left transition-all hover:border-[#377CF6]/25 hover:bg-[#377CF6]/5"
                     >
-                      <div className="text-caption font-semibold text-content">{match.name}</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-caption font-semibold text-content">{match.name}</div>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[8px] font-bold uppercase tracking-[.08em] ${match.providerMatched ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-surface-hover text-content-faint'}`}>
+                          {match.providerMatched && <Check size={9} strokeWidth={3} />}
+                          {match.providerMatched ? 'Map match' : 'AI match'}
+                        </span>
+                      </div>
                       <div className="mt-0.5 text-[10px] uppercase tracking-[.08em] text-content-faint">
                         {[match.region, match.country].filter(Boolean).join(' · ')}
                       </div>
